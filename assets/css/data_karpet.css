@@ -1,0 +1,77 @@
+/* assets/css/data_karpet.css */
+.karpet-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+}
+
+.form-group-k {
+    margin-bottom: 12px;
+}
+
+.form-group-k label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 4px;
+}
+
+.form-group-k input, 
+.form-group-k select {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    outline: none;
+}
+
+.form-group-k input:focus, 
+.form-group-k select:focus {
+    border-color: #3b82f6;
+}
+
+.btn-add {
+    width: 100%;
+    padding: 10px;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.btn-add:hover {
+    background: #2563eb;
+}
+
+.table-custom {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-custom th, .table-custom td {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 13px;
+}
+
+.table-custom th {
+    background: #f8fafc;
+    color: #475569;
+}
+
+.badge-m {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.badge-m.polos { background: #e0f2fe; color: #0369a1; }
+.badge-m.bermotif { background: #fef3c7; color: #92400e; }

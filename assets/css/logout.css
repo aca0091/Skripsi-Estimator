@@ -1,0 +1,19 @@
+.settings-tab-btn.tab-btn-logout {
+    text-decoration: none !important;
+    color: #ef4444 !important; /* Warna teks merah elegan */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 14px 18px;
+    border-top: 1px solid #f1f5f9;
+    transition: all 0.2s ease;
+}
+
+.settings-tab-btn.tab-btn-logout:hover {
+    background-color: #fef2f2 !important; /* Efek hover merah lembut */
+    color: #b91c1c !important;
+}

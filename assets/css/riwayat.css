@@ -1,0 +1,219 @@
+/* assets/css/riwayat.css - CV. Plastik Indah */
+
+/* --- Card Pembungkus Utama --- */
+.card-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
+}
+
+.box-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+
+/* --- Bar Filter & Pencarian --- */
+.filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-inp {
+    padding: 9px 14px;
+    font-size: 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    outline: none;
+    background: #ffffff;
+    color: #1e293b;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.filter-inp:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.btn-filter-action {
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: #2563eb;
+    color: #ffffff;
+    transition: background 0.2s ease;
+}
+
+.btn-filter-action:hover {
+    background: #1d4ed8;
+}
+
+.btn-reset-link {
+    font-size: 13px;
+    color: #dc2626;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.btn-reset-link:hover {
+    background: #fef2f2;
+}
+
+.filter-info-count {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.filter-info-count strong {
+    color: #0f172a;
+}
+
+/* --- Tabel Riwayat Terstruktur --- */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.table-riwayat {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    text-align: left;
+}
+
+.table-riwayat thead th {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.table-riwayat tbody td {
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.table-riwayat tbody tr:hover {
+    background: #f8fafc;
+}
+
+.table-riwayat tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badge Status Metode */
+.badge-status {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+    text-transform: capitalize;
+}
+
+.badge-status.disambung {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-status.permanen {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.badge-status.optimal {
+    background: #dcfce7;
+    color: #166534;
+}
+
+/* Tombol Aksi */
+.action-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-icon-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-pdf {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+}
+
+.btn-pdf:hover {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.btn-del-history {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.btn-del-history:hover {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+/* Pagination / Footer Tabel */
+.pagination-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 12.5px;
+    color: #64748b;
+    flex-wrap: wrap;
+    gap: 10px;
+}
