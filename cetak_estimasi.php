@@ -207,18 +207,28 @@ $nextLang = $lang === 'id' ? 'en' : 'id';
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 2px solid var(--brand-color);
-            padding-bottom: 6px;
+            gap: 6mm;
+            min-height: 17mm;
+            border-bottom: 2px solid #922c32;
+            padding-bottom: 2mm;
+            break-inside: avoid;
+            page-break-inside: avoid;
             margin-bottom: 10px;
         }
 
+        .kop-logo {
+            flex: 0 0 50mm;
+        }
+
         .kop-logo img {
-            max-width: 200px;
+            width: 50mm;
+            max-width: 100%;
             height: auto;
             display: block;
         }
 
         .kop-address {
+            flex: 1;
             text-align: right;
             font-size: 9pt;
             color: var(--text-regular);
@@ -226,8 +236,8 @@ $nextLang = $lang === 'id' ? 'en' : 'id';
         }
 
         .kop-address strong {
-            color: var(--brand-color);
-            font-size: 10pt;
+            color: #922c32;
+            font-size: 10.5pt;
             font-weight: bold;
         }
 
@@ -455,8 +465,7 @@ $nextLang = $lang === 'id' ? 'en' : 'id';
         <!-- KOP SURAT -->
         <div class="kop-surat">
             <div class="kop-logo">
-                <img src="assets/images/logo_estimasi.png" alt="CV. Plastik Indah"
-                    onerror="this.style.display='none'">
+                <img src="assets/images/logo_plastik_indah.png" alt="Plastik Indah — Interior Decoration &amp; Furnishing Material">
             </div>
             <div class="kop-address">
                 <strong>CV. PLASTIK INDAH</strong><br>
