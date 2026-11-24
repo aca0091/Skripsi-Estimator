@@ -1,9 +1,9 @@
-```php
 <?php
 require_once __DIR__ . '/require.php';
 
 $success = '';
 $error = '';
+$role = 'karyawan';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nama     = trim($_POST['nama_lengkap'] ?? '');
@@ -12,9 +12,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $konfirm  = $_POST['konfirmasi_password'] ?? '';
 
+    $role = $_POST['role'] ?? '';
+
     // Validasi input
     if (empty($nama) || empty($email) || empty($username) || empty($password)) {
         $error = 'Semua kolom wajib diisi!';
+    } elseif (!in_array($role, ['karyawan', 'owner'], true)) {
+        $error = 'Pilih jenis user Karyawan atau Owner.';
     } elseif ($password !== $konfirm) {
         $error = 'Konfirmasi password tidak cocok! Silakan cek kembali.';
     } elseif (strlen($password) < 6) {
@@ -31,11 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Menyimpan password dalam bentuk teks biasa
             $stmtInsert = $pdo->prepare(
-                "INSERT INTO tb_user (nama_lengkap, email, username, password)
-                 VALUES (?, ?, ?, ?)"
+                "INSERT INTO tb_user (nama_lengkap, email, username, password, role)
+                 VALUES (?, ?, ?, ?, ?)"
             );
 
-            if ($stmtInsert->execute([$nama, $email, $username, $password])) {
+            if ($stmtInsert->execute([$nama, $email, $username, $password, $role])) {
                 $success = 'Pendaftaran berhasil! Silakan login.';
             } else {
                 $error = 'Terjadi kesalahan sistem saat mendaftar.';
@@ -44,13 +48,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-```
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up / Daftar Akun - Carpet Estimator</title>
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
     <link rel="stylesheet" href="assets/css/register.css">
     <style>
         .pwd-wrapper {
@@ -76,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="auth-card">
         <div class="auth-header">
-            <div class="logo">📐</div>
+            <div class="logo"><img src="assets/images/logo_estimasi.png" alt="Logo CV. Plastik Indah"></div>
             <h2>Daftar Akun Baru</h2>
             <p>Buat akun dan tentukan kata sandi Anda sendiri</p>
         </div>
@@ -102,6 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="form-group">
                 <label>Username</label>
                 <input type="text" name="username" placeholder="Buat username unik" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required>
+            </div>
+
+            <div class="form-group">
+                <label for="role">Jenis User</label>
+                <select name="role" id="role" required aria-describedby="role-help">
+                    <option value="karyawan" <?= $role === 'karyawan' ? 'selected' : '' ?>>Karyawan</option>
+                    <option value="owner" <?= $role === 'owner' ? 'selected' : '' ?>>Owner</option>
+                </select>
+                <p id="role-help" style="font-size: 12px; color: #64748b; margin-top: 6px;">Karyawan: seluruh fitur. Owner: Dashboard dan Laporan.</p>
             </div>
 
             <div class="form-group">

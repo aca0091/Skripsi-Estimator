@@ -109,3 +109,12 @@ body {
     font-weight: 600;
 }
 
+
+.logo img {
+    display: block;
+    height: 64px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    margin: 0 auto;
+}

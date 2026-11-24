@@ -1,7 +1,8 @@
 <?php
 // riwayat_estimasi.php
+require_once __DIR__ . '/auth.php';
+check_page_access('riwayat_estimasi.php');
 require_once __DIR__ . '/require.php';
-check_auth();
 
 // Handle Hapus Riwayat Estimasi
 if (isset($_GET['hapus'])) {
@@ -47,39 +48,19 @@ $riwayatList = $stmt->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Riwayat Estimasi - Carpet Estimator</title>
-    <link rel="stylesheet" href="assets/css/dash.css">
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
+    <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <link rel="stylesheet" href="assets/css/riwayat.css">
+<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
 </head>
 <body>
     <div class="app-layout">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">📐</div>
-                <div class="brand-title">CARPET ESTIMATOR</div>
-            </div>
-            <nav class="nav-menu">
-                <a href="dashboard.php" class="nav-link"><span class="icon">🏠</span> <span>Dashboard</span></a>
-                <a href="data_karpet.php" class="nav-link"><span class="icon">📜</span> <span>Data Karpet</span></a>
-                <a href="data_ruangan.php" class="nav-link"><span class="icon">🚪</span> <span>Data Ruangan</span></a>
-                <a href="estimasi.php" class="nav-link"><span class="icon">➗</span> <span>Estimasi</span></a>
-                <a href="riwayat_estimasi.php" class="nav-link active"><span class="icon">🕒</span> <span>Riwayat Estimasi</span></a>
-                <a href="laporan.php" class="nav-link"><span class="icon">📊</span> <span>Laporan</span></a>
-                <a href="pengaturan.php" class="nav-link"><span class="icon">⚙️</span> <span>Pengaturan</span></a>
-            </nav>
-            <div class="user-profile">
-                <div class="avatar">👤</div>
-                <div class="profile-info">
-                    <div class="p-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin 1') ?></div>
-                    <div class="p-email"><?= htmlspecialchars($_SESSION['user_email'] ?? 'admin1@gmail.com') ?></div>
-                </div>
-            </div>
-            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?');" title="Keluar / Logout" style="background: #ef4444; color: #fff; text-decoration: none; padding: 6px 12px; border - radius: 4px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-            <span>🚪</span> Log Out </a>
-        </aside>
+        <?php $activePage = 'riwayat_estimasi'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- MAIN BODY -->
         <main class="main-body">
+<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
             <h1 class="main-title">Riwayat Estimasi Pemasangan</h1>
             <p class="breadcrumb">Beranda / Riwayat Estimasi / Arsip Kalkulasi Optimasi ILP</p>
 
@@ -144,8 +125,8 @@ $riwayatList = $stmt->fetchAll();
                                         <td><strong style="color: #0f172a;">Rp <?= number_format($row['total_biaya'], 0, ',', '.') ?></strong></td>
                                         <td>
                                             <div class="action-group">
-                                                <a href="cetak_estimasi.php?id=<?= $row['id_estimasi'] ?>" target="_blank" class="btn-icon-action btn-pdf" title="Cetak / Unduh PDF Penawaran">📄 PDF</a>
-                                                <a href="riwayat_estimasi.php?hapus=<?= $row['id_estimasi'] ?>" class="btn-icon-action btn-del-history" onclick="return confirm('Hapus arsip riwayat estimasi ini?')" title="Hapus Arsip">🗑️</a>
+                                                <a href="cetak_estimasi.php?id=<?= $row['id_estimasi'] ?>" target="_blank" class="btn-icon-action btn-pdf" title="Cetak / Unduh PDF Penawaran"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg> PDF</a>
+                                                <a href="riwayat_estimasi.php?hapus=<?= $row['id_estimasi'] ?>" class="btn-icon-action btn-del-history" onclick="return confirm('Hapus arsip riwayat estimasi ini?')" title="Hapus Arsip"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></a>
                                             </div>
                                         </td>
                                     </tr>

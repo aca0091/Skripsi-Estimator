@@ -1,7 +1,9 @@
 <?php
 // laporan.php
+require_once __DIR__ . '/auth.php';
+check_page_access('laporan.php');
 require_once __DIR__ . '/require.php';
-check_auth();
+require_once __DIR__ . '/customer_helpers.php';
 
 // Filter parameter
 $tglMulai     = isset($_GET['tgl_mulai']) ? $_GET['tgl_mulai'] : date('Y-m-01');
@@ -15,8 +17,9 @@ $karpets = $stmtKarpet->fetchAll();
 
 // Query laporan agregasi
 $sql = "
-    SELECT e.*, r.nama_ruangan, r.nama_pelanggan, k.nama_karpet, k.lebar_roll, k.harga_per_m_lari, u.nama_lengkap AS nama_admin
+    SELECT e.*, r.nama_ruangan, c.nama_customer AS nama_pelanggan, k.nama_karpet, k.lebar_roll, k.harga_per_m_lari, u.nama_lengkap AS nama_admin
     FROM tb_estimasi e
+    JOIN tb_customer c ON c.id_customer=e.id_customer
     JOIN tb_ruangan r ON e.id_ruangan = r.id_ruangan
     JOIN tb_karpet k ON e.id_karpet = k.id_karpet
     JOIN tb_user u ON e.id_user = u.id_user
@@ -38,6 +41,7 @@ $sql .= " ORDER BY e.tanggal_estimasi DESC, e.id_estimasi DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $dataLaporan = $stmt->fetchAll();
+$customerReport = customer_report($pdo, $tglMulai, $tglSelesai, $filterKarpet, $filterMetode);
 
 // Hitung total akumulasi
 $totProyek     = count($dataLaporan);
@@ -59,41 +63,22 @@ foreach ($dataLaporan as $row) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Estimasi - Carpet Estimator</title>
-    <link rel="stylesheet" href="assets/css/dash.css">
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
+    <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <link rel="stylesheet" href="assets/css/laporan.css">
+    <link rel="stylesheet" href="assets/css/customer.css">
+<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
 </head>
 <body>
     <div class="app-layout">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">📐</div>
-                <div class="brand-title">CARPET ESTIMATOR</div>
-            </div>
-            <nav class="nav-menu">
-                <a href="dashboard.php" class="nav-link"><span class="icon">🏠</span> <span>Dashboard</span></a>
-                <a href="data_karpet.php" class="nav-link"><span class="icon">📜</span> <span>Data Karpet</span></a>
-                <a href="data_ruangan.php" class="nav-link"><span class="icon">🚪</span> <span>Data Ruangan</span></a>
-                <a href="estimasi.php" class="nav-link"><span class="icon">➗</span> <span>Estimasi</span></a>
-                <a href="riwayat_estimasi.php" class="nav-link"><span class="icon">🕒</span> <span>Riwayat Estimasi</span></a>
-                <a href="laporan.php" class="nav-link active"><span class="icon">📊</span> <span>Laporan</span></a>
-                <a href="pengaturan.php" class="nav-link"><span class="icon">⚙️</span> <span>Pengaturan</span></a>
-            </nav>
-            <div class="user-profile">
-                <div class="avatar">👤</div>
-                <div class="profile-info">
-                    <div class="p-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin 1') ?></div>
-                    <div class="p-email"><?= htmlspecialchars($_SESSION['user_email'] ?? 'admin1@gmail.com') ?></div>
-                </div>
-            </div>
-            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?');" title="Keluar / Logout" style="background: #ef4444; color: #fff; text-decoration: none; padding: 6px 12px; border - radius: 4px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-            <span>🚪</span> Log Out </a>
-        </aside>
+        <?php $activePage = 'laporan'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- MAIN BODY -->
         <main class="main-body">
-            <h1 class="main-title">Laporan Estimasi & Optimasi Material</h1>
-            <p class="breadcrumb">Beranda / Laporan / Rekapitulasi Proyek CV. Plastik Indah</p>
+<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
+            <h1 class="main-title">Laporan</h1>
+            <p class="breadcrumb">Pantau nilai proyek, penggunaan material, dan perkembangan customer.</p>
 
             <!-- FORM FILTER PERIODE & KRITERIA -->
             <div class="report-filter-card">
@@ -156,12 +141,13 @@ foreach ($dataLaporan as $row) {
                 </div>
             </div>
 
+            <?php require __DIR__.'/includes/customer_report.php'; ?>
             <!-- TABEL DATA LAPORAN -->
             <div class="card-box">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                     <h3 class="box-title" style="margin-bottom: 0;">Rincian Transaksi Estimasi</h3>
                     <a href="cetak_laporan.php?tgl_mulai=<?= urlencode($tglMulai) ?>&tgl_selesai=<?= urlencode($tglSelesai) ?>&id_karpet=<?= $filterKarpet ?>&metode=<?= urlencode($filterMetode) ?>" target="_blank" class="btn-print-report">
-                        🖨️ Cetak Rekapitulasi Laporan (PDF)
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 17H3v-7h18v7h-3M6 14h12v7H6z"/></svg> Cetak Rekapitulasi Laporan (PDF)
                     </a>
                 </div>
 

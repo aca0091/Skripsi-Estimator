@@ -1,10 +1,9 @@
-```php
 <?php
 // login.php
 require_once __DIR__ . '/require.php';
 
 // Jika sudah login, langsung arahkan ke dashboard
-if (isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true) {
+if (is_authenticated()) {
     header('Location: dashboard.php');
     exit;
 }
@@ -27,8 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Membandingkan password secara langsung (plain text)
         if ($user && $password === $user['password']) {
 
+            session_regenerate_id(true);
             $_SESSION['user_logged_in'] = true;
             $_SESSION['user_id']        = $user['id_user'];
+            $_SESSION['user_role']      = $user['role'];
             $_SESSION['user_name']      = $user['nama_lengkap'];
             $_SESSION['user_email']     = $user['email'];
 
@@ -48,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Carpet Estimator</title>
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
     <link rel="stylesheet" href="assets/css/login.css">
 
     <style>
@@ -78,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-card">
 
         <div class="auth-header">
-            <div class="logo">📐</div>
+            <div class="logo"><img src="assets/images/logo_estimasi.png" alt="Logo CV. Plastik Indah"></div>
             <h2>Carpet Estimator</h2>
             <p>Sistem Pengukuran & Estimasi CV. Plastik Indah</p>
         </div>
@@ -152,4 +154,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </body>
 </html>
-```

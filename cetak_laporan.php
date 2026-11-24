@@ -1,6 +1,9 @@
 <?php
 // cetak_laporan.php
+require_once __DIR__ . '/auth.php';
+check_page_access('cetak_laporan.php');
 require_once __DIR__ . '/require.php';
+require_once __DIR__ . '/customer_helpers.php';
 
 $tglMulai     = isset($_GET['tgl_mulai']) ? $_GET['tgl_mulai'] : date('Y-m-01');
 $tglSelesai   = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d');
@@ -8,8 +11,9 @@ $filterKarpet = isset($_GET['id_karpet']) ? (int)$_GET['id_karpet'] : 0;
 $filterMetode = isset($_GET['metode']) ? $_GET['metode'] : '';
 
 $sql = "
-    SELECT e.*, r.nama_ruangan, r.nama_pelanggan, k.nama_karpet, k.lebar_roll, k.harga_per_m_lari
+    SELECT e.*, r.nama_ruangan, c.nama_customer AS nama_pelanggan, k.nama_karpet, k.lebar_roll, k.harga_per_m_lari
     FROM tb_estimasi e
+    JOIN tb_customer c ON c.id_customer=e.id_customer
     JOIN tb_ruangan r ON e.id_ruangan = r.id_ruangan
     JOIN tb_karpet k ON e.id_karpet = k.id_karpet
     WHERE e.tanggal_estimasi BETWEEN ? AND ?
@@ -30,6 +34,7 @@ $sql .= " ORDER BY e.tanggal_estimasi ASC, e.id_estimasi ASC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $dataLaporan = $stmt->fetchAll();
+$customerReport = customer_report($pdo, $tglMulai, $tglSelesai, $filterKarpet, $filterMetode);
 
 $totMeterLari  = 0;
 $totLuasBersih = 0;
@@ -48,6 +53,7 @@ foreach ($dataLaporan as $row) {
 <head>
     <meta charset="UTF-8">
     <title>Laporan Rekapitulasi Estimasi Karpet - CV. Plastik Indah</title>
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
     <style>
         :root {
             --primary-font: 'Times New Roman', Times, serif;
@@ -211,6 +217,7 @@ foreach ($dataLaporan as $row) {
             @page { size: landscape; }
         }
     </style>
+    <link rel="stylesheet" href="assets/css/customer.css">
 </head>
 <body>
 
@@ -223,7 +230,7 @@ foreach ($dataLaporan as $row) {
         <!-- KOP SURAT -->
         <div class="kop-surat">
             <div class="kop-logo">
-                <img src="assets/images/logo_plastik_indah.png" alt="CV. Plastik Indah">
+                <img src="assets/images/logo_estimasi.png" alt="CV. Plastik Indah">
             </div>
             <div class="kop-address">
                 <strong>CV. PLASTIK INDAH</strong><br>
@@ -285,6 +292,7 @@ foreach ($dataLaporan as $row) {
                 </tr>
             </tfoot>
         </table>
+        <?php require __DIR__.'/includes/customer_report.php'; ?>
 
         <!-- RINGKASAN & TANDA TANGAN -->
         <div class="report-summary-box">

@@ -1,10 +1,12 @@
 <?php
 // pengaturan.php
+require_once __DIR__ . '/auth.php';
+check_page_access('pengaturan.php');
 require_once __DIR__ . '/require.php';
 
 $msg = '';
 $msgType = '';
-$userId = $_SESSION['user_id'] ?? 1;
+$userId = (int) $_SESSION['user_id'];
 
 // 1. Ambil Data User Aktif
 $stmtU = $pdo->prepare("SELECT * FROM tb_user WHERE id_user = ?");
@@ -89,42 +91,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_backup') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pengaturan Sistem - Carpet Estimator</title>
-    <link rel="stylesheet" href="assets/css/dash.css">
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
+    <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <link rel="stylesheet" href="assets/css/pengaturan.css">
     <link rel="stylesheet" href="assets/css/logout.css">
+<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
 </head>
 <body>
     <div class="app-layout">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">📐</div>
-                <div class="brand-title">CARPET ESTIMATOR</div>
-            </div>
-            <nav class="nav-menu">
-                <a href="dashboard.php" class="nav-link"><span class="icon">🏠</span> <span>Dashboard</span></a>
-                <a href="data_karpet.php" class="nav-link"><span class="icon">📜</span> <span>Data Karpet</span></a>
-                <a href="data_ruangan.php" class="nav-link"><span class="icon">🚪</span> <span>Data Ruangan</span></a>
-                <a href="estimasi.php" class="nav-link"><span class="icon">➗</span> <span>Estimasi</span></a>
-                <a href="riwayat_estimasi.php" class="nav-link"><span class="icon">🕒</span> <span>Riwayat Estimasi</span></a>
-                <a href="laporan.php" class="nav-link"><span class="icon">📊</span> <span>Laporan</span></a>
-                <a href="pengaturan.php" class="nav-link active"><span class="icon">⚙️</span> <span>Pengaturan</span></a>
-            </nav>
-            <div class="user-profile">
-                <div class="avatar">👤</div>
-                <div class="profile-info">
-                    <div class="p-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin 1') ?></div>
-                    <div class="p-email"><?= htmlspecialchars($_SESSION['user_email'] ?? 'admin1@gmail.com') ?></div>
-                </div>
-            </div>
-            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?');" title="Keluar / Logout" style="background: #ef4444; color: #fff; text-decoration: none; padding: 6px 12px; border - radius: 4px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-            <span>🚪</span> Log Out </a>
-        </aside>
+        <?php $activePage = 'pengaturan'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- MAIN CONTENT -->
         <main class="main-body">
+<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
             <h1 class="main-title">Pengaturan Sistem</h1>
-            <p class="breadcrumb">Beranda / Konfigurasi & Pemeliharaan Sistem</p>
+            <p class="breadcrumb">Kelola profil, informasi perusahaan, keamanan, dan pencadangan data.</p>
 
             <?php if ($msg !== ''): ?>
                 <div class="alert-message alert-<?= $msgType ?>"><?= htmlspecialchars($msg) ?></div>
@@ -134,21 +116,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_backup') {
                 <!-- MENU TAB (Sesuai Bab 3.8.10) -->
                 <div class="settings-menu">
                     <button class="settings-tab-btn active" onclick="switchTab('tabProfil', this)">
-                        <span>👤</span> Pengaturan Profil
+                        <span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></span> Pengaturan Profil
                     </button>
                     <button class="settings-tab-btn" onclick="switchTab('tabPerusahaan', this)">
-                        <span>🏢</span> Pengaturan Perusahaan
+                        <span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 21v-4h6v4M8 7h1m6 0h1M8 11h1m6 0h1"/></svg></span> Pengaturan Perusahaan
                     </button>
                     <button class="settings-tab-btn" onclick="switchTab('tabBackup', this)">
-                        <span>💾</span> Backup Data
+                        <span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></svg></span> Backup Data
                     </button>
                     <button class="settings-tab-btn" onclick="switchTab('tabKeamanan', this)">
-                        <span>🔒</span> Pengaturan Keamanan
+                        <span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span> Pengaturan Keamanan
                     </button>
                    <a href="logout.php" 
                     onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?');" 
                      class="settings-tab-btn tab-btn-logout">
-                    <span>🚪</span> Log Out </a> 
+                    <span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5M21 12H9"/></svg></span> Log Out </a> 
                 </div>
 
                 <!-- AREA KONTEN TAB -->
@@ -212,7 +194,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_backup') {
                             Fitur ini memungkinkan pengelola sistem untuk mencadangkan seluruh master data karpet, data ruangan pelanggan, serta arsip kalkulasi estimasi ke dalam format file SQL terstruktur.
                         </p>
                         <div class="backup-card">
-                            <div style="font-size:36px;">📦</div>
+                            <div style="font-size:36px;"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></svg></div>
                             <div style="font-size:13px; font-weight:700; color:#0f172a; margin-top:6px;">Unduh Berkas Salinan Basis Data</div>
                             <div style="font-size:11.5px; color:#64748b; margin-top:2px;">Format .sql kompatibel dengan phpMyAdmin MySQL</div>
                             <a href="pengaturan.php?action=export_backup" class="btn-backup-download">

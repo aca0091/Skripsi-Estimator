@@ -1,14 +1,21 @@
 <?php
 // dashboard.php
+require_once __DIR__ . '/auth.php';
+check_page_access('dashboard.php');
 require_once __DIR__ . '/require.php';
-check_auth();
+
+// Gunakan relasi yang sama dengan laporan agar data tidak lengkap tidak dihitung.
+$estimasiFrom = 'tb_estimasi e
+    JOIN tb_ruangan r ON e.id_ruangan = r.id_ruangan
+    JOIN tb_karpet k ON e.id_karpet = k.id_karpet
+    JOIN tb_user u ON e.id_user = u.id_user';
 
 // 1. Total Estimasi yang telah dibuat
-$stmtTotalEst = $pdo->query("SELECT COUNT(*) AS total FROM tb_estimasi");
+$stmtTotalEst = $pdo->query("SELECT COUNT(*) AS total FROM $estimasiFrom");
 $totalEstimasi = (int)($stmtTotalEst->fetch()['total'] ?? 0);
 
 // 2. Total Data Ruangan
-$stmtTotalR = $pdo->query("SELECT COUNT(*) AS total FROM tb_ruangan");
+$stmtTotalR = $pdo->query("SELECT COUNT(DISTINCT e.id_ruangan) AS total FROM $estimasiFrom");
 $totalRuangan = (int)($stmtTotalR->fetch()['total'] ?? 0);
 
 // 3. Total Jenis Karpet
@@ -16,19 +23,19 @@ $stmtTotalK = $pdo->query("SELECT COUNT(*) AS total FROM tb_karpet");
 $totalKarpet = (int)($stmtTotalK->fetch()['total'] ?? 0);
 
 // 4. Total Nilai Estimasi Biaya Keseluruhan
-$stmtTotalBiaya = $pdo->query("SELECT COALESCE(SUM(total_biaya), 0) AS total FROM tb_estimasi");
+$stmtTotalBiaya = $pdo->query("SELECT COALESCE(SUM(total_biaya), 0) AS total FROM $estimasiFrom");
 $totalBiayaAll = (float)($stmtTotalBiaya->fetch()['total'] ?? 0);
 
 // 5. Ringkasan Estimasi Bulan Berjalan (Dinamis Berdasarkan Bulan & Tahun Saat Ini)
 $blnIni = (int)date('m');
 $thnIni = (int)date('Y');
 $stmtBulanIni = $pdo->prepare("
-    SELECT 
+    SELECT
         COALESCE(SUM(total_luas), 0) AS sum_luas,
         COALESCE(SUM(total_sambungan), 0) AS sum_sambungan,
         COALESCE(SUM(total_obras), 0) AS sum_obras,
         COALESCE(SUM(total_biaya), 0) AS sum_biaya
-    FROM tb_estimasi 
+    FROM $estimasiFrom
     WHERE MONTH(tanggal_estimasi) = ? AND YEAR(tanggal_estimasi) = ?
 ");
 $stmtBulanIni->execute([$blnIni, $thnIni]);
@@ -45,8 +52,7 @@ $labelBulanIni = $namaBulanIndo[$blnIni] . ' ' . $thnIni;
 // 6. Data Estimasi Terbaru (Limit 3 Proyek Terakhir)
 $stmtLatest = $pdo->query("
     SELECT e.kode_estimasi, e.total_biaya, e.tanggal_estimasi, r.nama_ruangan, r.nama_pelanggan
-    FROM tb_estimasi e
-    JOIN tb_ruangan r ON e.id_ruangan = r.id_ruangan
+    FROM $estimasiFrom
     ORDER BY e.id_estimasi DESC LIMIT 3
 ");
 $estimasiTerbaru = $stmtLatest->fetchAll();
@@ -56,12 +62,12 @@ $chartLabels = [];
 $chartCounts = [];
 
 for ($i = 5; $i >= 0; $i--) {
-    $time = strtotime("-$i month");
+    $time = strtotime("first day of -$i month");
     $m = (int)date('m', $time);
     $y = (int)date('Y', $time);
     $chartLabels[] = substr($namaBulanIndo[$m], 0, 3);
 
-    $stmtC = $pdo->prepare("SELECT COUNT(*) AS total FROM tb_estimasi WHERE MONTH(tanggal_estimasi) = ? AND YEAR(tanggal_estimasi) = ?");
+    $stmtC = $pdo->prepare("SELECT COUNT(*) AS total FROM $estimasiFrom WHERE MONTH(tanggal_estimasi) = ? AND YEAR(tanggal_estimasi) = ?");
     $stmtC->execute([$m, $y]);
     $chartCounts[] = (int)($stmtC->fetch()['total'] ?? 0);
 }
@@ -72,79 +78,43 @@ for ($i = 5; $i >= 0; $i--) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DASHBOARD - Carpet Estimator</title>
-    <link rel="stylesheet" href="assets/css/dash.css">
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
+    <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
 </head>
 <body>
     <div class="app-layout">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">📐</div>
-                <div class="brand-title">CARPET ESTIMATOR</div>
-            </div>
-
-            <nav class="nav-menu">
-                <a href="dashboard.php" class="nav-link active">
-                    <span class="icon">🏠</span> <span>Dashboard</span>
-                </a>
-                <a href="data_karpet.php" class="nav-link">
-                    <span class="icon">📜</span> <span>Data Karpet</span>
-                </a>
-                <a href="data_ruangan.php" class="nav-link">
-                    <span class="icon">🚪</span> <span>Data Ruangan</span>
-                </a>
-                <a href="estimasi.php" class="nav-link">
-                    <span class="icon">➗</span> <span>Estimasi</span>
-                </a>
-                <a href="riwayat_estimasi.php" class="nav-link">
-                    <span class="icon">🕒</span> <span>Riwayat Estimasi</span>
-                </a>
-                <a href="laporan.php" class="nav-link">
-                    <span class="icon">📊</span> <span>Laporan</span>
-                </a>
-                <a href="pengaturan.php" class="nav-link">
-                    <span class="icon">⚙️</span> <span>Pengaturan</span>
-                </a>
-            </nav>
-
-            <div class="user-profile">
-                <div class="avatar">👤</div>
-                <div class="profile-info">
-                    <div class="p-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin 1') ?></div>
-                    <div class="p-email"><?= htmlspecialchars($_SESSION['user_email'] ?? 'admin1@gmail.com') ?></div>
-                </div>
-            </div>
-            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?');" title="Keluar / Logout" style="background: #ef4444; color: #fff; text-decoration: none; padding: 6px 12px; border - radius: 4px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-            <span>🚪</span> Log Out </a>
-        </aside>
+        <?php $activePage = 'dashboard'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- MAIN CONTENT -->
         <main class="main-body">
+<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
             <div class="header-section">
-                <h1 class="main-title">DASHBOARD</h1>
-                <p class="breadcrumb">Beranda / Dashboard</p>
+                <h1 class="main-title">Dashboard</h1>
+                <p class="breadcrumb">Ringkasan aktivitas proyek dan performa estimasi perusahaan.</p>
             </div>
 
             <!-- 4 KARTU METRIK UTAMA (SINKRON DATABASE) -->
             <div class="metric-row">
                 <div class="stat-card">
-                    <div class="stat-label">Total Estimasi</div>
+                    <div class="metric-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg></div><div class="stat-label">Total Estimasi</div>
                     <div class="stat-number"><?= $totalEstimasi ?></div>
                     <div class="stat-desc">Total estimasi yang dibuat</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Total Ruangan</div>
+                    <div class="metric-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 21v-4h6v4M8 7h1m6 0h1M8 11h1m6 0h1"/></svg></div><div class="stat-label">Total Ruangan</div>
                     <div class="stat-number"><?= $totalRuangan ?></div>
                     <div class="stat-desc">Total data ruangan</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Jenis Karpet</div>
+                    <div class="metric-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><div class="stat-label">Jenis Karpet</div>
                     <div class="stat-number"><?= $totalKarpet ?></div>
                     <div class="stat-desc">Total jenis karpet</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Total Estimasi Biaya</div>
+                    <div class="metric-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 8V4l14-2v3M21 10h-7v5h7M17 12.5h.01"/></svg></div><div class="stat-label">Total Estimasi Biaya</div>
                     <div class="stat-number cost">Rp <?= number_format($totalBiayaAll, 0, ',', '.') ?></div>
                     <div class="stat-desc">Total estimasi biaya yang telah dibuat</div>
                 </div>
@@ -153,9 +123,13 @@ for ($i = 5; $i >= 0; $i--) {
             <!-- BARIS SPLIT: GRAFIK & ESTIMASI TERBARU -->
             <div class="content-split-row">
                 <div class="card-box chart-box">
-                    <h3 class="box-title">Grafik Estimasi (6 Bulan Terakhir)</h3>
+                    <h3 class="box-title">Aktivitas Estimasi</h3>
                     <div class="chart-wrapper">
-                        <canvas id="monthlyChart"></canvas>
+                        <?php if (array_sum($chartCounts) > 0): ?>
+                            <canvas id="monthlyChart"></canvas>
+                        <?php else: ?>
+                            <div style="height:100%;min-height:180px;display:flex;align-items:center;justify-content:center;color:#64748b;text-align:center;">Belum ada estimasi tersimpan dalam 6 bulan terakhir.</div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -186,7 +160,7 @@ for ($i = 5; $i >= 0; $i--) {
 
             <!-- KARTU RINGKASAN BAWAH (DINAMIS BULAN BERJALAN) -->
             <div class="card-box summary-box">
-                <h3 class="box-title">Ringkasan Total Estimasi per Bulan ini (<?= $labelBulanIni ?>)</h3>
+                <h3 class="box-title">Ringkasan Bulanan · <?= $labelBulanIni ?></h3>
                 <div class="summary-columns">
                     <div class="sum-col">
                         <div class="s-label">Total Luas Bersih</div>
@@ -211,7 +185,9 @@ for ($i = 5; $i >= 0; $i--) {
 
     <!-- Script Render Grafik Sinkron 6 Bulan -->
     <script>
-        const ctx = document.getElementById('monthlyChart').getContext('2d');
+        const chartCanvas = document.getElementById('monthlyChart');
+        if (chartCanvas) {
+        const ctx = chartCanvas.getContext('2d');
         const labelsBulan = <?= json_encode($chartLabels) ?>;
         const dataEstimasi = <?= json_encode($chartCounts) ?>;
 
@@ -249,6 +225,7 @@ for ($i = 5; $i >= 0; $i--) {
                 }
             }
         });
+        }
     </script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 <?php
 // data_karpet.php
+require_once __DIR__ . '/auth.php';
+check_page_access('data_karpet.php');
 require_once __DIR__ . '/require.php';
-check_auth();
 
 // Tambah Karpet Baru (Harga & Stok dalam Meter Panjang / Meter Lari)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_karpet'])) {
@@ -25,53 +26,19 @@ $karpetList = $pdo->query("SELECT * FROM tb_karpet ORDER BY id_karpet DESC")->fe
 <head>
     <meta charset="UTF-8">
     <title>Data Karpet - CV. Plastik Indah</title>
-    <link rel="stylesheet" href="assets/css/dash.css">
+    <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
+    <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <link rel="stylesheet" href="assets/css/data_karpet.css">
+<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
 </head>
 <body>
     <div class="app-layout">
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">📐</div>
-                <div class="brand-title">CARPET ESTIMATOR</div>
-            </div>
-            <nav class="nav-menu">
-                <a href="dashboard.php" class="nav-link">
-                    <span class="icon">🏠</span> <span>Dashboard</span>
-                </a>
-                <a href="data_karpet.php" class="nav-link active">
-                    <span class="icon">📜</span> <span>Data Karpet</span>
-                </a>
-                <a href="data_ruangan.php" class="nav-link">
-                    <span class="icon">🚪</span> <span>Data Ruangan</span>
-                </a>
-                <a href="estimasi.php" class="nav-link">
-                    <span class="icon">➗</span> <span>Estimasi</span>
-                </a>
-                <a href="riwayat_estimasi.php" class="nav-link">
-                    <span class="icon">🕒</span> <span>Riwayat Estimasi</span>
-                </a>
-                <a href="laporan.php" class="nav-link">
-                    <span class="icon">📊</span> <span>Laporan</span>
-                </a>
-                <a href="pengaturan.php" class="nav-link">
-                    <span class="icon">⚙️</span> <span>Pengaturan</span>
-                </a>
-            </nav>
-            <div class="user-profile">
-                <div class="avatar">👤</div>
-                <div class="profile-info">
-                    <div class="p-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin 1') ?></div>
-                    <div class="p-email"><?= htmlspecialchars($_SESSION['user_email'] ?? 'admin1@gmail.com') ?></div>
-                </div>
-            </div>
-            <a href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?');" title="Keluar / Logout" style="background: #ef4444; color: #fff; text-decoration: none; padding: 6px 12px; border - radius: 4px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-            <span>🚪</span> Log Out </a>
-        </aside>
+        <?php $activePage = 'data_karpet'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <main class="main-body">
-            <h1 class="main-title">Data Master Karpet</h1>
-            <p class="breadcrumb">Beranda / Master Data / Data Karpet Roll</p>
+<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
+            <h1 class="main-title">Data Karpet</h1>
+            <p class="breadcrumb">Kelola katalog, harga, dan ketersediaan karpet perusahaan.</p>
 
             <div class="karpet-grid">
                 <!-- Form Tambah -->

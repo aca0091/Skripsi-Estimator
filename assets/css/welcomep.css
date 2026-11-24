@@ -79,3 +79,11 @@ body {
 .btn-register:hover {
     background: rgba(255, 255, 255, 0.15);
 }
+.logo-circle img {
+    display: block;
+    height: 80px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    margin: 0 auto;
+}

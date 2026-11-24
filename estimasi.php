@@ -1,27 +1,36 @@
 <?php
 // estimasi.php
+require_once __DIR__ . '/auth.php';
+check_page_access('estimasi.php');
 require_once __DIR__ . '/require.php';
-check_auth();
 
 // 1. Ambil Katalog Karpet
 $stmtK = $pdo->query("SELECT * FROM tb_karpet ORDER BY nama_karpet ASC");
 $karpetList = $stmtK->fetchAll();
+$customerList = $pdo->query('SELECT id_customer,nama_customer FROM tb_customer ORDER BY nama_customer,id_customer')->fetchAll();
 
 // 2. Simpan Estimasi ke Basis Data
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_final_estimate') {
-    $namaPelanggan   = trim($_POST['nama_pelanggan_custom'] ?? 'Umum');
+    $idCustomer = filter_var($_POST['id_customer'] ?? null, FILTER_VALIDATE_INT);
+    $stmtCustomer = $pdo->prepare('SELECT nama_customer FROM tb_customer WHERE id_customer=?');
+    $stmtCustomer->execute([$idCustomer ?: 0]);
+    $namaPelanggan = $stmtCustomer->fetchColumn();
+    if ($namaPelanggan === false) { http_response_code(422); exit('Pilih customer yang terdaftar sebelum menyimpan proyek.'); }
+    $tanggalEstimasi = $_POST['tanggal_estimasi'] ?? '';
+    $date = is_string($tanggalEstimasi) ? DateTimeImmutable::createFromFormat('!Y-m-d', $tanggalEstimasi) : false;
+    if (!$date || $date->format('Y-m-d') !== $tanggalEstimasi) { http_response_code(422); exit('Tanggal estimasi tidak valid.'); }
     $namaRuangan     = trim($_POST['nama_ruangan_custom'] ?? 'Ruangan Baru');
     $namaObjekCustom = trim($_POST['nama_objek_custom'] ?? 'Objek');
-    
+
     $panjangRuang    = (float)($_POST['panjang_ruang'] ?? 0);
     $lebarRuang      = (float)($_POST['lebar_ruang'] ?? 0);
     $luasObjek       = (float)($_POST['luas_objek'] ?? 0);
     $totalLuas       = (float)($_POST['total_luas_bersih'] ?? 0);
-    
+
     $idKarpet        = (int)$_POST['id_karpet'];
     $arah            = $_POST['arah_pemasangan'] ?? 'Vertikal';
     $metodePasang    = $_POST['metode_pemasangan'] ?? 'Disambung';
-    
+
     $totalMeterLari  = (float)($_POST['total_meter_lari'] ?? 0);
     $totalSambungan  = ($metodePasang === 'Permanen') ? 0 : (float)($_POST['total_sambungan'] ?? 0);
     $totalObras      = ($metodePasang === 'Permanen') ? 0 : (float)($_POST['total_obras'] ?? 0);
@@ -31,10 +40,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $totalBiaya      = (float)($_POST['total_biaya'] ?? 0);
     $idUser          = $_SESSION['user_id'] ?? 1;
 
-    // A. Simpan data ruangan baru
-    $luasKotor = ($panjangRuang > 0 && $lebarRuang > 0) ? ($panjangRuang * $lebarRuang) : $totalLuas;
+    require_once __DIR__ . '/room_geometry.php';
+    try {
+        $geometry = measure_room_geometry($_POST['layout_geometry'] ?? '');
+        if (!is_finite($luasObjek) || $luasObjek < 0 || $luasObjek >= $geometry['area']) {
+            throw new InvalidArgumentException('Luas objek harus lebih kecil dari luas ruangan.');
+        }
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        exit(htmlspecialchars($error->getMessage(), ENT_QUOTES, 'UTF-8'));
+    }
+    $panjangRuang = $geometry['width'];
+    $lebarRuang = $geometry['height'];
+    $luasKotor = $geometry['area'];
+    $totalLuas = $luasKotor - $luasObjek;
+    $totalObras = $metodePasang === 'Permanen' ? 0 : $geometry['perimeter'];
+    $pdo->beginTransaction();
+    // Simpan batas ruangan bersama estimasi agar cetak memakai bentuk yang sama.
     $stmtR = $pdo->prepare("
-        INSERT INTO tb_ruangan (nama_ruangan, nama_pelanggan, panjang, lebar, luas_objek, luas_kotor, luas_bersih) 
+        INSERT INTO tb_ruangan (nama_ruangan, nama_pelanggan, panjang, lebar, luas_objek, luas_kotor, luas_bersih)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtR->execute([$namaRuangan, $namaPelanggan, $panjangRuang, $lebarRuang, $luasObjek, $luasKotor, $totalLuas]);
@@ -48,18 +72,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     // C. Simpan estimasi
     $stmtSave = $pdo->prepare("
         INSERT INTO tb_estimasi (
-            kode_estimasi, id_ruangan, id_karpet, id_user, arah_pemasangan, metode_pemasangan, 
-            total_luas, total_meter_lari, total_sambungan, total_obras, biaya_lem, biaya_jasa_pasang, 
-            luas_waste, total_biaya, tanggal_estimasi
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())
+            kode_estimasi, id_ruangan, id_karpet, id_user, arah_pemasangan, metode_pemasangan,
+            total_luas, total_meter_lari, total_sambungan, total_obras, biaya_lem, biaya_jasa_pasang,
+            luas_waste, total_biaya, tanggal_estimasi, layout_geometry, id_customer
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtSave->execute([
-        $kodeEstimasi, $idRuanganBaru, $idKarpet, $idUser, $arah, $metodePasang, 
-        $totalLuas, $totalMeterLari, $totalSambungan, $totalObras, 
-        $biayaLem, $biayaJasaPasang, $luasWaste, $totalBiaya
+        $kodeEstimasi, $idRuanganBaru, $idKarpet, $idUser, $arah, $metodePasang,
+        $totalLuas, $totalMeterLari, $totalSambungan, $totalObras,
+        $biayaLem, $biayaJasaPasang, $luasWaste, $totalBiaya, $tanggalEstimasi, $geometry['json'], $idCustomer
     ]);
 
     $lastId = $pdo->lastInsertId();
+    $pdo->commit();
 
     if (isset($_POST['submit_type']) && $_POST['submit_type'] === 'save_and_print') {
         header("Location: cetak_estimasi.php?id=" . $lastId);
@@ -77,9 +102,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modul Estimasi Karpet - CV. Plastik Indah</title>
     <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
-    <link rel="stylesheet" href="assets/css/dash.css">
+    <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <link rel="stylesheet" href="assets/css/estimasi.css">
     <style>
+        .calculation-status { display:flex; align-items:center; gap:12px; padding:16px 18px; margin:16px 0; border:1px solid #dbeafe; border-radius:12px; background:#eff6ff; color:#1e40af; font-size:15px; font-weight:600; }
+        .calculation-spinner { display:none; width:22px; height:22px; flex:0 0 22px; border:3px solid #bfdbfe; border-top-color:#2563eb; border-radius:50%; animation:calculation-spin .8s linear infinite; }
+        .calculation-status[data-loading="true"] .calculation-spinner { display:block; }
+        .calculation-status[data-state="error"] { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
+        #measurementSummary[aria-busy="true"] { opacity:.45; }
+        #measurementStatus:empty { display:none; }
+        #nextCarpetButton:disabled { opacity:.5; cursor:wait; }
+        .layout-tools { margin:14px 0; }
+        .layout-tools summary { cursor:pointer; font-weight:600; color:#475569; margin-bottom:12px; }
+        @keyframes calculation-spin { to { transform:rotate(360deg); } }
+        @media (prefers-reduced-motion:reduce) { .calculation-spinner { animation:none; } }
+
         .wizard-step { cursor: pointer; user-select: none; }
         .canvas-container-box {
             background: #0b0f19;
@@ -105,45 +142,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             margin-bottom: 16px;
         }
     </style>
+<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
 </head>
 <body>
     <div class="app-layout">
         <!-- SIDEBAR -->
-        <aside class="sidebar">
-            <div class="brand" style="display: flex; align-items: center; gap: 12px; padding: 18px 16px;">
-                <img src="assets/images/logo_estimasi.png" alt="Logo" style="height: 38px; width: auto; object-fit: contain;">
-                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">CARPET ESTIMATOR</span>
-            </div>
-
-            <nav class="nav-menu">
-                <a href="dashboard.php" class="nav-link"><span class="icon">🏠</span> <span>Dashboard</span></a>
-                <a href="data_karpet.php" class="nav-link"><span class="icon">📜</span> <span>Data Karpet</span></a>
-                <a href="data_ruangan.php" class="nav-link"><span class="icon">🚪</span> <span>Data Ruangan</span></a>
-                <a href="estimasi.php" class="nav-link active">
-                    <img src="assets/images/logo_estimasi.png" alt="Icon" style="width: 18px; height: 18px; object-fit: contain; vertical-align: middle;">
-                    <span>Estimasi</span>
-                </a>
-                <a href="riwayat_estimasi.php" class="nav-link"><span class="icon">🕒</span> <span>Riwayat Estimasi</span></a>
-                <a href="laporan.php" class="nav-link"><span class="icon">📊</span> <span>Laporan</span></a>
-                <a href="pengaturan.php" class="nav-link"><span class="icon">⚙️</span> <span>Pengaturan</span></a>
-            </nav>
-
-            <div class="user-profile" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="avatar" style="width: 32px; height: 32px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center;">👤</div>
-                    <div class="profile-info">
-                        <div class="p-name" style="font-size: 12.5px; font-weight: 600; color: #fff;"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Admin') ?></div>
-                        <div class="p-email" style="font-size: 10.5px; color: #94a3b8;"><?= htmlspecialchars($_SESSION['user_email'] ?? '') ?></div>
-                    </div>
-                </div>
-                <a href="logout.php" onclick="return confirm('Yakin ingin keluar?');" style="background:#ef4444; color:#fff; text-decoration:none; padding:5px 9px; border-radius:4px; font-size:11px; font-weight:600;">Log Out</a>
-            </div>
-        </aside>
+        <?php $activePage = 'estimasi'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <!-- MAIN CONTENT -->
         <main class="main-body">
-            <h1 class="main-title">Modul Estimasi Karpet</h1>
-            <p class="breadcrumb">Beranda / Estimasi / Citra Layout, Sambungan, Lem & Obras, serta Optimasi ILP</p>
+<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
+            <h1 class="main-title">Estimasi Karpet</h1>
+            <p class="breadcrumb">Buat estimasi kebutuhan material dan biaya pemasangan, langkah demi langkah.</p>
 
             <!-- WIZARD BAR -->
             <div class="wizard-bar">
@@ -179,6 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <input type="hidden" name="arah_pemasangan" id="post_arah" value="Vertikal">
                 <input type="hidden" name="metode_pemasangan" id="post_metode" value="Disambung">
                 <input type="hidden" name="total_luas_bersih" id="post_luas_bersih">
+                <input type="hidden" name="layout_geometry" id="post_layout_geometry">
                 <input type="hidden" name="total_meter_lari" id="post_meter_lari">
                 <input type="hidden" name="total_sambungan" id="post_sambungan">
                 <input type="hidden" name="total_obras" id="post_obras">
@@ -190,12 +201,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <!-- TAHAP 1: DATA UMUM -->
                 <div class="tab-content-panel active" id="panelStep1">
                     <div class="card-box">
-                        <h3 class="box-title">Tahap 1: Formulir Data Umum Estimasi (Gambar 3.24)</h3>
-                        
+                        <h3 class="box-title">Tahap 1: Formulir Data Umum Estimasi</h3>
+
                         <div class="form-row-2">
                             <div>
                                 <label class="form-lbl">Nama Pelanggan / Perusahaan <span style="color:#ef4444;">*</span></label>
-                                <input type="text" name="nama_pelanggan_custom" id="txtPelanggan" class="form-ctrl" placeholder="Contoh: Sintia / Rumah Aca" required>
+                                <select name="id_customer" id="txtPelanggan" class="form-ctrl" required>
+                                    <option value="">Pilih customer terdaftar</option>
+                                    <?php foreach ($customerList as $customer): ?>
+                                    <option value="<?= (int)$customer['id_customer'] ?>" <?= (int)($_GET['id_customer'] ?? 0)===(int)$customer['id_customer']?'selected':'' ?>><?= htmlspecialchars($customer['nama_customer']) ?> (#<?= (int)$customer['id_customer'] ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <a href="data_customer.php">Tambah / kelola customer</a>
+                                <?php if (!$customerList): ?><p>Daftarkan customer terlebih dahulu sebelum membuat proyek.</p><?php endif; ?>
                             </div>
                             <div>
                                 <label class="form-lbl">Nama Ruangan / Proyek <span style="color:#ef4444;">*</span></label>
@@ -216,9 +234,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                         <label class="form-lbl">Upload Sketsa Denah 2D Ruangan <span style="color:#ef4444;">*</span></label>
                         <div class="upload-dropzone" onclick="document.getElementById('inputLayoutFile').click()">
-                            <span style="font-size:36px;">📷</span>
-                            <div style="font-weight:700; margin-top:6px; color:#1e293b;" id="txtUploadNama">Klik atau seret foto denah layout ke sini</div>
-                            <div style="font-size:12px; color:#94a3b8;">Format sketsa tampak atas (JPG/PNG) sesuai Bab 3.7.1</div>
+                            <span class="upload-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 3-3 5 5"/></svg></span>
+                            <div style="font-weight:700; margin-top:6px; color:#1e293b;" id="txtUploadNama">Klik untuk memilih foto denah layout</div>
+                            <div style="font-size:12px; color:#94a3b8;">Format sketsa tampak atas (JPG/PNG) </div>
                             <input type="file" name="foto_layout" id="inputLayoutFile" accept="image/*" style="display:none;" onchange="handleImageFile(this)">
                         </div>
 
@@ -231,38 +249,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <!-- TAHAP 2: EKSTRAKSI CITRA & DETEKSI OTOMATIS -->
                 <div class="tab-content-panel" id="panelStep2">
                     <div class="card-box">
-                        <h3 class="box-title">Tahap 2: Ekstraksi Bentuk, Dimensi & Keliling Ruangan (Gambar 3.25)</h3>
-                        
+                        <h3 class="box-title">Tahap 2: Batas Ruangan & Kalibrasi Ukuran</h3>
+
                         <div class="canvas-container-box">
-                            <canvas id="layoutSimCanvas" width="600" height="320"></canvas>
+                            <canvas id="layoutSimCanvas" width="1000" height="470" style="width:100%;height:auto;cursor:crosshair"></canvas>
                         </div>
 
-                        <!-- Status Badge -->
-                        <div class="canvas-legend" style="display:flex; gap:10px; margin: 12px 0; flex-wrap:wrap;">
-                            <span class="legend-badge wall" style="background:#dcfce7; color:#166534; padding:5px 10px; border-radius:4px; font-weight:600; font-size:11px;">🟢 Kontur Dinding Luar & Lekukan</span>
-                            <span class="legend-badge obstacle" style="background:#fee2e2; color:#991b1b; padding:5px 10px; border-radius:4px; font-weight:600; font-size:11px;">🟥 Kontur Objek Terdeteksi</span>
-                            <span class="legend-badge" style="background:#fef3c7; color:#92400e; padding:5px 10px; border-radius:4px; font-weight:600; font-size:11px;">🟡 Titik Vertex Sudut Poligon</span>
+                        <div id="calculationStatus" class="calculation-status" role="status" aria-live="polite" data-loading="false">
+                            <span class="calculation-spinner" aria-hidden="true"></span>
+                            <span id="dimensionReadStatus">Unggah gambar, lalu pilih garis untuk mengisi ukuran.</span>
                         </div>
-
-                        <!-- Parameter Ukuran Hasil Deteksi -->
-                        <div class="form-row-3">
-                            <div>
-                                <label class="form-lbl">Panjang Ruang (m)</label>
-                                <input type="number" step="0.01" id="dimPanjang" class="form-ctrl" value="10.00" oninput="runSimulasiDanHitung()">
+                        <section style="padding:16px;border:1px solid #bfdbfe;border-radius:12px;margin:16px 0;background:#f8fbff">
+                            <h4 style="margin:0 0 12px">Ukuran per sisi — klik garis pada gambar</h4>
+                            <div class="form-row-3">
+                                <div><label class="form-lbl" for="edgeSelect">Garis yang dipilih</label><select id="edgeSelect" class="form-ctrl" onchange="selectRoomEdge(Number(this.value))"><option value="-1">Pilih garis</option></select></div>
+                                <div><label class="form-lbl" for="edgeLength">Panjang sisi</label><input id="edgeLength" type="text" inputmode="decimal" class="form-ctrl" placeholder="Masukkan panjang"></div>
+                                <div><label class="form-lbl" for="edgeUnit">Satuan</label><select id="edgeUnit" class="form-ctrl"><option value="m">m</option><option value="cm">cm</option></select></div>
                             </div>
-                            <div>
-                                <label class="form-lbl">Lebar Ruang (m)</label>
-                                <input type="number" step="0.01" id="dimLebar" class="form-ctrl" value="6.00" oninput="runSimulasiDanHitung()">
+                            <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn-wizard btn-next" onclick="applyRoomEdgeMeasurement()">Terapkan ukuran sisi</button><button type="button" class="btn-wizard" onclick="clearRoomEdgeMeasurements()">Hapus ukuran sisi manual</button></div>
+                            <p id="edgeMeasurementStatus" role="status" style="margin:12px 0 0">Pilih garis hijau atau pilih pasangan titik di atas.</p>
+                        </section>
+                        <details class="layout-tools"><summary>Edit batas ruangan</summary>
+                            <p id="layoutStatus" role="status"></p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+                                <button type="button" class="btn-wizard" onclick="prosesCitraDigitalNyata(true)">Deteksi ulang</button>
+                                <button type="button" class="btn-wizard" onclick="startManualOutline()">Gambar batas manual</button>
+                                <button type="button" class="btn-wizard" onclick="resetLastPoint()">Batalkan titik terakhir</button>
+                                <button type="button" class="btn-wizard" onclick="finishManualOutline()">Selesai menggambar</button>
                             </div>
-                            <div>
-                                <label class="form-lbl">Ukuran Masuk Lekukan (m)</label>
-                                <input type="number" step="0.01" id="dimLekukan" class="form-ctrl" value="1.00" oninput="runSimulasiDanHitung()">
-                            </div>
+                        </details>
+                        <div class="form-row-2">
+                            <div><label class="form-lbl">Panjang total (m)</label>
+                                <input type="number" min="0.001" step="0.001" id="dimPanjang" readonly class="form-ctrl" placeholder="Masukkan hasil pengukuran" oninput="runSimulasiDanHitung()"></div>
+                            <div><label class="form-lbl">Lebar total (m)</label>
+                                <input type="number" min="0.001" step="0.001" id="dimLebar" readonly class="form-ctrl" placeholder="Masukkan hasil pengukuran" oninput="runSimulasiDanHitung()"></div>
                         </div>
-
+                        <select id="dimensionUnit" hidden><option value="m">Meter</option></select>
+                        <div id="vertexInputs" hidden></div>
+                        <input type="checkbox" id="confirmScale" hidden>
+                        <section style="padding:16px;border:1px solid #ddd6fe;border-radius:12px;margin:16px 0">
+                            <h4>Objek di dalam denah</h4>
+                            <p>Klik garis merah/ungu untuk mengukur sisi objek, atau isi lebar dan tinggi (meter) di bawah. Kandidat belum tentu objek: periksa sebelum menghitung. Lebar dan tinggi adalah ukuran total horizontal dan vertikal objek. Luas mengikuti bentuk sudut yang digambar; pastikan proporsi bentuk sesuai denah.</p>
+                            <div id="detectedObjects" aria-live="polite"></div>
+                            <button type="button" class="btn-wizard" onclick="startObjectPolygon()">Gambar objek (3+ sudut)</button>
+                            <button type="button" class="btn-wizard" onclick="undoObjectPoint()">Batalkan sudut terakhir</button>
+                            <button type="button" class="btn-wizard btn-next" onclick="finishObjectPolygon()">Selesai gambar objek</button>
+                            <p id="objectDrawStatus" role="status" aria-live="polite"></p>
+                            <button type="button" class="btn-wizard" onclick="cancelObjectPolygon()">Batalkan gambar objek</button>
+                        </section>
                         <!-- KOTAK EDIT KETERANGAN & LUAS OBJEK -->
                         <div class="objek-edit-box">
-                            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px;">Keterangan & Luas Objek (Bisa Diedit):</div>
+                            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px;">Luas objek yang tidak dipasangi karpet (opsional):</div>
                             <div class="form-row-2" style="margin-bottom:0;">
                                 <div>
                                     <label class="form-lbl">Keterangan / Nama Objek</label>
@@ -270,23 +307,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 </div>
                                 <div>
                                     <label class="form-lbl">Luas Objek (m²)</label>
-                                    <input type="number" step="0.01" id="dimObjek" class="form-ctrl" value="3.20" oninput="runSimulasiDanHitung()">
+                                    <input type="number" step="0.01" id="dimObjek" class="form-ctrl" value="0" min="0" oninput="runSimulasiDanHitung()">
                                 </div>
                             </div>
                         </div>
 
+                        <details style="margin:12px 0"><summary>Hitung luas objek dari panjang × lebar × jumlah</summary>
+
+                            <div class="form-row-3">
+                                <div><label class="form-lbl">Panjang objek (m)</label><input type="number" id="objectLength" min="0" step="0.01" class="form-ctrl"></div>
+                                <div><label class="form-lbl">Lebar objek (m)</label><input type="number" id="objectWidth" min="0" step="0.01" class="form-ctrl"></div>
+                                <div><label class="form-lbl">Jumlah objek</label><input type="number" id="objectCount" min="1" step="1" value="1" class="form-ctrl"></div>
+                            </div>
+                            <button type="button" class="btn-wizard" onclick="calculateObjectArea()">Gunakan luas objek</button>
+                        </details>
+                        <p id="measurementStatus" role="status" style="color:#334155;line-height:1.6"></p>
                         <!-- Geometri Ringkasan -->
-                        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:16px;">
+                        <div id="measurementSummary" aria-busy="false" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:16px;">
                             <div style="display:flex; justify-content:space-around; flex-wrap:wrap; font-size:13px; color:#1e3a8a;">
-                                <div>Luas Total Kotor: <strong id="lblGross">57.50 m²</strong></div>
-                                <div>Luas Bersih Efektif: <strong id="lblNet" style="color:#2563eb;">54.30 m²</strong></div>
-                                <div>Keliling Total Tepi: <strong id="lblPerimeter" style="color:#10b981;">34.00 m</strong></div>
+                                <div>Luas Total Kotor: <strong id="lblGross">—</strong></div>
+                                <div>Luas Objek: <strong id="lblObjectArea">0,00 m²</strong></div>
+                                <div>Luas Bersih Efektif: <strong id="lblNet" style="color:#2563eb;">—</strong></div>
+                                <div>Keliling Total Tepi: <strong id="lblPerimeter" style="color:#10b981;">—</strong></div>
                             </div>
                         </div>
 
                         <div class="action-nav-buttons" style="display:flex; justify-content:space-between;">
                             <button type="button" class="btn-wizard btn-prev" onclick="goToStep(1)">⬅ Kembali</button>
-                            <button type="button" class="btn-wizard btn-next" onclick="goToStep(3)">Lanjut ke Pemilihan Karpet (Tahap 3) ➜</button>
+                            <button type="button" id="nextCarpetButton" class="btn-wizard btn-next" onclick="goToStep(3)">Lanjut Pilih Karpet ➜</button>
                         </div>
                     </div>
                 </div>
@@ -294,16 +342,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <!-- TAHAP 3: PILIH KARPET, METODE & OPTIMASI ILP -->
                 <div class="tab-content-panel" id="panelStep3">
                     <div class="card-box">
-                        <h3 class="box-title">Tahap 3: Pemilihan Karpet, Metode & Optimasi Arah ILP (Gambar 3.26)</h3>
+                        <h3 class="box-title">Tahap 3: Pilih Karpet, Metode & Arah Pemasangan</h3>
 
                         <div class="form-row-2">
                             <div>
                                 <label class="form-lbl">Pilih Jenis Karpet Roll</label>
                                 <select id="selectBahanKarpet" class="form-ctrl" onchange="runSimulasiDanHitung(); renderVisualArahVertikal(); renderVisualArahHorizontal();">
                                     <?php foreach ($karpetList as $k): ?>
-                                        <option value="<?= $k['id_karpet'] ?>" 
-                                                data-nama="<?= htmlspecialchars($k['nama_karpet']) ?>" 
-                                                data-lebar="<?= $k['lebar_roll'] ?>" 
+                                        <option value="<?= $k['id_karpet'] ?>"
+                                                data-nama="<?= htmlspecialchars($k['nama_karpet']) ?>"
+                                                data-lebar="<?= $k['lebar_roll'] ?>"
                                                 data-harga="<?= $k['harga_per_m_lari'] ?>"
                                                 <?= ($k['lebar_roll'] == 4.00) ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($k['nama_karpet']) ?> (Lebar: <?= $k['lebar_roll'] ?>m | Rp <?= number_format($k['harga_per_m_lari'],0,',','.') ?>/m lari)
@@ -331,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <input type="number" id="tarifSambungan" class="form-ctrl" value="25000" oninput="runSimulasiDanHitung()">
                             </div>
                             <div>
-                                <label class="form-lbl">Tarif Jasa Obras Tepi & Lekukan (per m)</label>
+                                <label class="form-lbl">Tarif Jasa Obras Tepi Ruangan (per m)</label>
                                 <input type="number" id="tarifObras" class="form-ctrl" value="15000" oninput="runSimulasiDanHitung()">
                             </div>
                         </div>
@@ -348,6 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             </div>
                         </div>
 
+                        <p style="font-size:13px;color:#475569">Potongan mengikuti rentang kontur tiap jalur roll. Perhitungan belum mencakup cadangan potong, penyamaan motif, atau penggunaan ulang sisa. Pengurangan objek hanya mengubah luas bersih.</p>
                         <!-- KARTU KOMPARASI ILP: VERTIKAL VS HORIZONTAL -->
                         <div class="compare-grid">
                             <!-- KARTU VERTIKAL -->
@@ -393,7 +442,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <!-- TAHAP 4: HASIL ESTIMASI & CETAK -->
                 <div class="tab-content-panel" id="panelStep4">
                     <div class="card-box">
-                        <h3 class="box-title">Tahap 4: Ringkasan Estimasi & Penawaran Biaya (Gambar 3.27)</h3>
+                        <h3 class="box-title">Tahap 4: Ringkasan Estimasi & Penawaran Biaya</h3>
 
                         <table class="result-table-box">
                             <tr>
@@ -429,7 +478,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <td id="resBiayaSambung">-</td>
                             </tr>
                             <tr id="rowResObras">
-                                <th>Keliling Obras Tepi & Lekukan</th>
+                                <th>Keliling Obras Tepi Ruangan</th>
                                 <td id="resObras">-</td>
                             </tr>
                             <tr id="rowResBiayaObras">
@@ -469,6 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
 
     <!-- JAVASCRIPT DETEKSI CITRA, KOMPUTASI ILP, DAN INTERAKSI -->
+    <script src="assets/js/room-geometry.js?v=3"></script>
     <script>
         let currentStep = 1;
         let selectedArah = 'Vertikal';
@@ -488,28 +538,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         function handleImageFile(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
+                resetLayoutEstimate(false);
+                const uploadVersion = layoutUploadVersion;
+                setCalculationLoading(true, 'Mendeteksi garis ruangan…');
                 const lbl = document.getElementById('txtUploadNama');
-                if (lbl) lbl.innerHTML = `⏳ <em>Memuat berkas sketsa: ${file.name}...</em>`;
+                if (lbl) lbl.textContent = `Memuat berkas sketsa: ${file.name}...`;
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
+                    if (uploadVersion !== layoutUploadVersion) return;
                     const img = new Image();
                     img.onload = function() {
+                        if (uploadVersion !== layoutUploadVersion) return;
                         uploadedImageObj = img;
                         isImageReady = true;
-                        if (lbl) lbl.innerHTML = `✅ Gambar Denah Terpasang: <strong>${file.name}</strong>`;
+                        if (lbl) lbl.textContent = `Gambar Denah Terpasang: ${file.name}`;
+                        prosesCitraDigitalNyata();
+                        setCalculationLoading(false, 'Pilih garis dan masukkan panjang sisi.');
                         if (currentStep === 2) {
                             prosesCitraDigitalNyata();
                         }
                     };
+                    img.onerror = () => { if (uploadVersion !== layoutUploadVersion) return; isImageReady = false; uploadedImageObj = null; acceptRoomPoints([]); setCalculationLoading(false, 'Gambar tidak dapat dibaca. Pilih JPG atau PNG.', true); };
                     img.src = e.target.result;
                 };
+                reader.onerror = () => { if (uploadVersion === layoutUploadVersion) setCalculationLoading(false, 'Gambar gagal dimuat. Coba unggah ulang.', true); };
                 reader.readAsDataURL(file);
             }
         }
 
         // 2. NAVIGASI STEP WIZARD
         function goToStep(step) {
+            if (step === 1 && currentStep !== 1) resetLayoutEstimate();
+            if (step >= 3 && !validateLayout()) return;
             currentStep = step;
             for (let i = 1; i <= 4; i++) {
                 const panel = document.getElementById('panelStep' + i);
@@ -541,296 +602,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             } catch (err) {
                 console.warn("Render log:", err);
             }
-        }
-
-        // 3. EDIT KETERANGAN NAMA OBJEK SECARA BEBAS
-        function updateNamaObjek() {
-            const val = document.getElementById('txtNamaObjek')?.value.trim();
-            customNamaObjek = val !== "" ? val : "Objek";
-            document.getElementById('post_nama_objek').value = customNamaObjek;
-            
-            if (isImageReady && uploadedImageObj) {
-                prosesCitraDigitalNyata();
-            } else {
-                renderMainCanvas();
-            }
-        }
-
-        // 4. PIPELINE PENGOLAHAN CITRA MURNI (MENGIKUTI FOTO GAMBAR DENAH)
-        function prosesCitraDigitalNyata() {
-            if (!uploadedImageObj || !mainCtx) return;
-
-            const cW = mainCanvas.width;
-            const cH = mainCanvas.height;
-
-            // Bersihkan kanvas
-            mainCtx.clearRect(0, 0, cW, cH);
-            mainCtx.fillStyle = '#0b0f19';
-            mainCtx.fillRect(0, 0, cW, cH);
-
-            // Skalakan gambar presisi ke dalam kanvas
-            const pad = 25;
-            const scale = Math.min((cW - (pad * 2)) / uploadedImageObj.width, (cH - (pad * 2)) / uploadedImageObj.height);
-            const drawW = Math.max(10, Math.floor(uploadedImageObj.width * scale));
-            const drawH = Math.max(10, Math.floor(uploadedImageObj.height * scale));
-            const startX = Math.floor((cW - drawW) / 2);
-            const startY = Math.floor((cH - drawH) / 2);
-
-            // 1. Tampilkan foto asli dengan kontras penuh
-            mainCtx.drawImage(uploadedImageObj, startX, startY, drawW, drawH);
-
-            try {
-                // 2. Baca piksel untuk segmentasi
-                const imgData = mainCtx.getImageData(startX, startY, drawW, drawH);
-                const data = imgData.data;
-                const binary = [];
-
-                for (let y = 0; y < drawH; y++) {
-                    binary[y] = [];
-                    for (let x = 0; x < drawW; x++) {
-                        const idx = (y * drawW + x) * 4;
-                        const gray = 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
-                        binary[y][x] = (gray < 135) ? 1 : 0;
-                    }
-                }
-
-                // 3. Scan Batas Dinding Luar
-                let minX = drawW, maxX = 0, minY = drawH, maxY = 0;
-                for (let y = Math.floor(drawH * 0.08); y < drawH * 0.92; y++) {
-                    for (let x = Math.floor(drawW * 0.05); x < drawW * 0.95; x++) {
-                        if (binary[y][x] === 1) {
-                            if (x < minX) minX = x;
-                            if (x > maxX) maxX = x;
-                            if (y < minY) minY = y;
-                            if (y > maxY) maxY = y;
-                        }
-                    }
-                }
-
-                const rX = startX + minX;
-                const rY = startY + minY;
-                const rW = Math.max(60, maxX - minX);
-                const rH = Math.max(50, maxY - minY);
-
-                // Render latar transparan agar garis sketsa terlihat
-                mainCtx.clearRect(0, 0, cW, cH);
-                mainCtx.fillStyle = '#0b0f19';
-                mainCtx.fillRect(0, 0, cW, cH);
-
-                mainCtx.globalAlpha = 0.40;
-                mainCtx.drawImage(uploadedImageObj, startX, startY, drawW, drawH);
-                mainCtx.globalAlpha = 1.0;
-
-                // Parameter Lekukan Siku di Dinding Kanan
-                const lekukW = rW * 0.22;
-                const lekukH = rH * 0.35;
-                const notchX = rX + rW - lekukW;
-                const notchY = rY + (rH * 0.30);
-
-                // 4. Gambar Kontur Garis Dinding Luar (Hijau)
-                mainCtx.strokeStyle = '#10b981';
-                mainCtx.lineWidth = 3;
-                mainCtx.fillStyle = 'rgba(16, 185, 129, 0.15)';
-                mainCtx.beginPath();
-                mainCtx.moveTo(rX, rY);
-                mainCtx.lineTo(rX + rW, rY);
-                mainCtx.lineTo(rX + rW, notchY);
-                mainCtx.lineTo(notchX, notchY);
-                mainCtx.lineTo(notchX, notchY + lekukH);
-                mainCtx.lineTo(rX + rW, notchY + lekukH);
-                mainCtx.lineTo(rX + rW, rY + rH);
-                mainCtx.lineTo(rX, rY + rH);
-                mainCtx.closePath();
-                mainCtx.fill();
-                mainCtx.stroke();
-
-                // 5. Gambar Titik Vertex Poligon (Kuning)
-                mainCtx.fillStyle = '#f59e0b';
-                const corners = [
-                    [rX, rY], [rX + rW, rY], [rX + rW, notchY], [notchX, notchY],
-                    [notchX, notchY + lekukH], [rX + rW, notchY + lekukH],
-                    [rX + rW, rY + rH], [rX, rY + rH]
-                ];
-                corners.forEach(pt => {
-                    mainCtx.beginPath();
-                    mainCtx.arc(pt[0], pt[1], 4.5, 0, Math.PI * 2);
-                    mainCtx.fill();
-                });
-
-                // 6. Deteksi Kontur Objek Merah di Kiri (Bisa diedit namanya)
-                const objX = rX + (rW * 0.14);
-                const objY = rY + (rH * 0.22);
-                const objW = rW * 0.16;
-                const objH = rH * 0.46;
-
-                mainCtx.fillStyle = 'rgba(239, 68, 68, 0.65)';
-                mainCtx.strokeStyle = '#ef4444';
-                mainCtx.lineWidth = 2;
-                mainCtx.fillRect(objX, objY, objW, objH);
-                mainCtx.strokeRect(objX, objY, objW, objH);
-
-                // Teks Nama Objek Dinamis
-                mainCtx.fillStyle = '#ffffff';
-                mainCtx.font = 'bold 11px Arial';
-                mainCtx.fillText(`${customNamaObjek} (3.2 x 1.0 m)`, objX - 4, objY - 6);
-
-                runSimulasiDanHitung();
-
-            } catch (err) {
-                console.error("Deteksi citra catch:", err);
-                renderMainCanvas();
-            }
-        }
-
-        // 5. KANVAS DEFAULT TAHAP 2 JIKA GAMBAR BELUM DIUPLOAD
-        function renderMainCanvas() {
-            if (!mainCtx) return;
-            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-            mainCtx.fillStyle = '#0b0f19';
-            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
-
-            mainCtx.strokeStyle = '#10b981';
-            mainCtx.lineWidth = 3;
-            mainCtx.fillStyle = 'rgba(16, 185, 129, 0.15)';
-            mainCtx.beginPath();
-            mainCtx.moveTo(80, 50);
-            mainCtx.lineTo(500, 50);
-            mainCtx.lineTo(500, 120);
-            mainCtx.lineTo(420, 120);
-            mainCtx.lineTo(420, 190);
-            mainCtx.lineTo(500, 190);
-            mainCtx.lineTo(500, 250);
-            mainCtx.lineTo(80, 250);
-            mainCtx.closePath();
-            mainCtx.fill();
-            mainCtx.stroke();
-
-            mainCtx.fillStyle = '#f59e0b';
-            [[80, 50], [500, 50], [500, 120], [420, 120], [420, 190], [500, 190], [500, 250], [80, 250]].forEach(pt => {
-                mainCtx.beginPath();
-                mainCtx.arc(pt[0], pt[1], 4.5, 0, Math.PI * 2);
-                mainCtx.fill();
-            });
-
-            // Objek Merah
-            mainCtx.fillStyle = 'rgba(239, 68, 68, 0.65)';
-            mainCtx.strokeStyle = '#ef4444';
-            mainCtx.lineWidth = 2;
-            mainCtx.fillRect(170, 95, 60, 100);
-            mainCtx.strokeRect(170, 95, 60, 100);
-
-            mainCtx.fillStyle = '#ffffff';
-            mainCtx.font = 'bold 11px Arial';
-            mainCtx.fillText(`${customNamaObjek} (3.2 x 1.0 m)`, 165, 85);
-        }
-
-        // 6. HELPER PANAH
-        function drawArrow(ctx, fromX, fromY, toX, toY) {
-            if (!ctx) return;
-            const headlen = 6;
-            const angle = Math.atan2(toY - fromY, toX - fromX);
-            ctx.beginPath();
-            ctx.moveTo(fromX, fromY);
-            ctx.lineTo(toX, toY);
-            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
-            ctx.moveTo(toX, toY);
-            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
-            ctx.stroke();
-        }
-
-        // 7. PREVIEW VERTIKAL TAHAP 3
-        function renderVisualArahVertikal() {
-            if (!ctxVert) return;
-            ctxVert.clearRect(0, 0, cvVert.width, cvVert.height);
-
-            // Dinding berlekuk
-            ctxVert.strokeStyle = '#10b981';
-            ctxVert.fillStyle = 'rgba(37, 99, 235, 0.15)';
-            ctxVert.lineWidth = 2;
-            ctxVert.beginPath();
-            ctxVert.moveTo(25, 15);
-            ctxVert.lineTo(215, 15);
-            ctxVert.lineTo(215, 45);
-            ctxVert.lineTo(180, 45);
-            ctxVert.lineTo(180, 85);
-            ctxVert.lineTo(215, 85);
-            ctxVert.lineTo(215, 115);
-            ctxVert.lineTo(25, 115);
-            ctxVert.closePath();
-            ctxVert.fill();
-            ctxVert.stroke();
-
-            // Objek merah
-            ctxVert.fillStyle = 'rgba(239, 68, 68, 0.6)';
-            ctxVert.fillRect(65, 35, 25, 50);
-
-            // Garis sambungan vertikal putus-putus
-            if (selectedMetode === 'Disambung') {
-                ctxVert.strokeStyle = '#f59e0b';
-                ctxVert.lineWidth = 1.8;
-                ctxVert.setLineDash([4, 3]);
-                ctxVert.beginPath();
-                ctxVert.moveTo(120, 15);
-                ctxVert.lineTo(120, 115);
-                ctxVert.stroke();
-                ctxVert.setLineDash([]);
-            }
-
-            // Panah Vertikal
-            ctxVert.strokeStyle = '#38bdf8';
-            ctxVert.lineWidth = 1.5;
-            drawArrow(ctxVert, 35, 100, 35, 30);
-
-            ctxVert.fillStyle = '#93c5fd';
-            ctxVert.font = '10px Arial';
-            ctxVert.fillText('Jalur 1', 75, 25);
-            ctxVert.fillText('Jalur 2', 145, 25);
-        }
-
-        // 8. PREVIEW HORIZONTAL TAHAP 3
-        function renderVisualArahHorizontal() {
-            if (!ctxHoriz) return;
-            ctxHoriz.clearRect(0, 0, cvHoriz.width, cvHoriz.height);
-
-            ctxHoriz.strokeStyle = '#10b981';
-            ctxHoriz.fillStyle = 'rgba(99, 102, 241, 0.15)';
-            ctxHoriz.lineWidth = 2;
-            ctxHoriz.beginPath();
-            ctxHoriz.moveTo(25, 15);
-            ctxHoriz.lineTo(215, 15);
-            ctxHoriz.lineTo(215, 45);
-            ctxHoriz.lineTo(180, 45);
-            ctxHoriz.lineTo(180, 85);
-            ctxHoriz.lineTo(215, 85);
-            ctxHoriz.lineTo(215, 115);
-            ctxHoriz.lineTo(25, 115);
-            ctxHoriz.closePath();
-            ctxHoriz.fill();
-            ctxHoriz.stroke();
-
-            ctxHoriz.fillStyle = 'rgba(239, 68, 68, 0.6)';
-            ctxHoriz.fillRect(65, 35, 25, 50);
-
-            if (selectedMetode === 'Disambung') {
-                ctxHoriz.strokeStyle = '#f59e0b';
-                ctxHoriz.lineWidth = 1.8;
-                ctxHoriz.setLineDash([4, 3]);
-                ctxHoriz.beginPath();
-                ctxHoriz.moveTo(25, 65);
-                ctxHoriz.lineTo(180, 65);
-                ctxHoriz.stroke();
-                ctxHoriz.setLineDash([]);
-            }
-
-            // Panah Horizontal
-            ctxHoriz.strokeStyle = '#a5b4fc';
-            ctxHoriz.lineWidth = 1.5;
-            drawArrow(ctxHoriz, 40, 25, 160, 25);
-
-            ctxHoriz.fillStyle = '#c7d2fe';
-            ctxHoriz.font = '10px Arial';
-            ctxHoriz.fillText('Jalur 1 (Atas)', 100, 50);
-            ctxHoriz.fillText('Jalur 2 (Bawah)', 100, 95);
         }
 
         // 9. METODE PASANG (SAMBUNG VS PERMANEN)
@@ -888,21 +659,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             runSimulasiDanHitung();
         }
 
-        // 11. MATEMATIKA INTEGER LINEAR PROGRAMMING (ILP)
+        // 11. PERHITUNGAN POTONGAN PER JALUR POLIGON
         function runSimulasiDanHitung() {
-            const P = parseFloat(document.getElementById('dimPanjang')?.value) || 10.0;
-            const L = parseFloat(document.getElementById('dimLebar')?.value) || 6.0;
-            const lekukan = parseFloat(document.getElementById('dimLekukan')?.value) || 1.0;
-            const luasObjek = parseFloat(document.getElementById('dimObjek')?.value) || 3.2;
+            const points = realRoomPoints();
+            const valid = RoomGeometry.valid(points);
+            const box = valid ? RoomGeometry.bounds(points) : {minX:0,maxX:0,minY:0,maxY:0};
+            const P = box.maxX-box.minX, L = box.maxY-box.minY;
+            const luasObjek = Math.max(0, Number(document.getElementById('dimObjek').value) || 0);
+            const grossArea = valid ? RoomGeometry.area(points) : 0;
+            const netArea = Math.max(0, grossArea-luasObjek);
+            const totalKelilingObras = valid ? RoomGeometry.perimeter(points) : 0;
+            document.getElementById('post_layout_geometry').value = valid ? JSON.stringify({version:1,points}) : '';
+            document.getElementById('lblGross').innerText = valid ? grossArea.toLocaleString('id-ID', {minimumFractionDigits:2,maximumFractionDigits:2}) + ' m²' : 'Belum dihitung';
+            document.getElementById('lblNet').innerText = valid && luasObjek<grossArea ? netArea.toLocaleString('id-ID', {minimumFractionDigits:2,maximumFractionDigits:2}) + ' m²' : 'Belum dihitung';
+            document.getElementById('lblPerimeter').innerText = valid ? totalKelilingObras.toLocaleString('id-ID', {minimumFractionDigits:2,maximumFractionDigits:2}) + ' m' : 'Belum dihitung';
 
-            // Geometri
-            const grossArea = (P * L) - (lekukan * 2.5);
-            const netArea = Math.max(0, grossArea - luasObjek);
-            const totalKelilingObras = (2 * (P + L)) + (2 * lekukan);
-
-            document.getElementById('lblGross').innerText = grossArea.toFixed(2) + ' m²';
-            document.getElementById('lblNet').innerText = netArea.toFixed(2) + ' m²';
-            document.getElementById('lblPerimeter').innerText = totalKelilingObras.toFixed(2) + ' m';
+            document.getElementById('lblObjectArea').innerText = luasObjek.toLocaleString('id-ID', {minimumFractionDigits:2,maximumFractionDigits:2}) + ' m²';
+            updateMeasurementStatus();
 
             // Parameter Bahan
             const kSelect = document.getElementById('selectBahanKarpet');
@@ -919,10 +692,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const tarifPasang  = parseFloat(document.getElementById('tarifJasaPasang')?.value) || 0;
 
             // Perhitungan Vertikal: Rol ditarik memanjang L (6m), butuh potongan menutupi P (10m)
-            const stripsV = Math.max(1, Math.ceil(P / rollW));
-            const meterLariV = stripsV * L;
-            const wasteV = Math.max(0, (meterLariV * rollW) - netArea);
-            const seamsV = (stripsV - 1) * L;
+            const planV = RoomGeometry.strips(points, rollW, 0);
+            const stripsV = planV.count;
+            const meterLariV = planV.length;
+            const wasteV = Math.max(0, meterLariV * rollW - netArea);
+            const seamsV = planV.seams;
 
             let costV = 0, biayaLemTotal = 0, biayaPasangTotal = 0;
             if (selectedMetode === 'Disambung') {
@@ -939,10 +713,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             document.getElementById('vCostText').innerText = 'Rp ' + Math.round(costV).toLocaleString('id-ID');
 
             // Perhitungan Horizontal: Rol ditarik memanjang P (10m), butuh potongan menutupi L (6m)
-            const stripsH = Math.max(1, Math.ceil(L / rollW));
-            const meterLariH = stripsH * P;
-            const wasteH = Math.max(0, (meterLariH * rollW) - netArea);
-            const seamsH = (stripsH - 1) * P;
+            const planH = RoomGeometry.strips(points, rollW, 1);
+            const stripsH = planH.count;
+            const meterLariH = planH.length;
+            const wasteH = Math.max(0, meterLariH * rollW - netArea);
+            const seamsH = planH.seams;
 
             let costH = 0;
             if (selectedMetode === 'Disambung') {
@@ -989,12 +764,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 document.getElementById('post_waste').value = wasteH;
                 document.getElementById('post_biaya').value = costH;
             }
+            renderVisualArahVertikal();
+            renderVisualArahHorizontal();
+            renderMainCanvas();
         }
 
         // 12. SINKRONISASI TABEL RINCIAN TAHAP 4
         function syncFinalTable() {
+            runSimulasiDanHitung();
             const kSelect = document.getElementById('selectBahanKarpet');
-            const pel = document.getElementById('txtPelanggan')?.value || 'Umum';
+            const pel = document.getElementById('txtPelanggan')?.selectedOptions[0]?.textContent || '';
             const ruang = document.getElementById('txtRuangan')?.value || 'Ruangan Baru';
             const net = parseFloat(document.getElementById('post_luas_bersih')?.value) || 0;
             const seams = parseFloat(document.getElementById('post_sambungan')?.value) || 0;
@@ -1043,7 +822,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         // 13. SUBMIT FORM
+        function validateLayout() {
+            const error = measurementError();
+            if (calculationLoading) { return false; }
+            if (error) {
+                goToStep(2);
+                const message = error;
+                document.getElementById('measurementStatus').textContent=message;
+                alert(message); return false;
+            }
+            return true;
+        }
         function submitForm(type) {
+            if (!validateLayout()) return;
+            const select=document.getElementById('selectBahanKarpet');
+            if (!select.value) { alert('Tambahkan dan pilih data karpet terlebih dahulu.'); return; }
+            if (!document.getElementById('txtPelanggan').value.trim() || !document.getElementById('txtRuangan').value.trim()) {goToStep(1); alert('Isi nama pelanggan dan ruangan.'); return;}
+            runSimulasiDanHitung();
             document.getElementById('post_submit_type').value = type;
             document.getElementById('mainEstimasiForm').submit();
         }
@@ -1055,5 +850,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             runSimulasiDanHitung();
         };
     </script>
+    <script src="assets/js/edge-dimensions.js?v=3"></script>
+    <script src="assets/js/layout-editor.js?v=11"></script>
 </body>
 </html>

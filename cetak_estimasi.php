@@ -1,5 +1,7 @@
 <?php
 // cetak_estimasi.php
+require_once __DIR__ . '/auth.php';
+check_page_access('cetak_estimasi.php');
 require_once __DIR__ . '/require.php';
 
 // Ambil ID Estimasi secara fleksibel
@@ -386,7 +388,7 @@ $nextLang = ($lang === 'id') ? 'en' : 'id';
         <!-- KOP SURAT -->
         <div class="kop-surat">
             <div class="kop-logo">
-                <img src="assets/images/logo_plastik_indah.png" alt="CV. Plastik Indah" onerror="this.style.display='none'">
+                <img src="assets/images/logo_estimasi.png" alt="CV. Plastik Indah" onerror="this.style.display='none'">
             </div>
             <div class="kop-address">
                 <strong>CV. PLASTIK INDAH</strong><br>
@@ -531,6 +533,7 @@ $nextLang = ($lang === 'id') ? 'en' : 'id';
         </div>
     </div>
 
+    <script src="assets/js/room-geometry.js"></script>
     <script>
         function triggerPrint() {
             window.print();
@@ -546,60 +549,28 @@ $nextLang = ($lang === 'id') ? 'en' : 'id';
             if (!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = '#22c55e';
-            ctx.fillStyle = 'rgba(34, 197, 94, 0.12)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(16, 10);
-            ctx.lineTo(174, 10);
-            ctx.lineTo(174, 78);
-            ctx.lineTo(135, 78);
-            ctx.lineTo(135, 56);
-            ctx.lineTo(96, 56);
-            ctx.lineTo(96, 78);
-            ctx.lineTo(16, 78);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
-            ctx.fillRect(45, 26, 36, 20);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 7.5pt "Times New Roman"';
-            ctx.fillText(isEnglish ? 'Obstacle' : 'Objek', 47, 39);
-
-            if (metode === 'Disambung') {
-                ctx.strokeStyle = '#eab308';
-                ctx.lineWidth = 1.6;
-                ctx.setLineDash([4, 3]);
-
-                if (arah === 'Vertikal') {
-                    ctx.beginPath();
-                    ctx.moveTo(96, 10);
-                    ctx.lineTo(96, 56);
-                    ctx.stroke();
-                } else {
-                    ctx.beginPath();
-                    ctx.moveTo(16, 44);
-                    ctx.lineTo(174, 44);
-                    ctx.stroke();
-                }
-                ctx.setLineDash([]);
+            const geometry = <?= json_encode(json_decode($est['layout_geometry'] ?? 'null', true), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            if (!geometry || !RoomGeometry.valid(geometry.points)) {
+                ctx.fillStyle = '#475569'; ctx.font = '11px Arial';
+                ctx.fillText(isEnglish ? 'No saved room outline' : 'Kontur belum tersimpan', 12, 40);
+                return;
             }
-
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 1.4;
-            if (arah === 'Vertikal') {
-                drawArrow(ctx, 26, 68, 26, 20);
-                ctx.fillStyle = '#38bdf8';
-                ctx.font = 'bold 8pt "Times New Roman"';
-                ctx.fillText(isEnglish ? '↕ Vertical' : '↕ Vertikal', 120, 30);
-            } else {
-                drawArrow(ctx, 28, 20, 160, 20);
-                ctx.fillStyle = '#38bdf8';
-                ctx.font = 'bold 8pt "Times New Roman"';
-                ctx.fillText(isEnglish ? '↔ Horizontal' : '↔ Horizontal', 108, 66);
+            const points=geometry.points, b=RoomGeometry.bounds(points);
+            const scale=Math.min((canvas.width-24)/(b.maxX-b.minX),(canvas.height-24)/(b.maxY-b.minY));
+            const x=(canvas.width-(b.maxX-b.minX)*scale)/2,y=(canvas.height-(b.maxY-b.minY)*scale)/2;
+            ctx.save(); ctx.beginPath();
+            points.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](x+(p[0]-b.minX)*scale,y+(p[1]-b.minY)*scale));
+            ctx.closePath(); ctx.fillStyle='rgba(16,185,129,.12)'; ctx.fill();ctx.strokeStyle='#059669';ctx.lineWidth=2;ctx.stroke();ctx.clip();
+            const width=<?= json_encode((float)$est['lebar_roll']) ?>;
+            const axis=arah==='Vertikal'?0:1,start=axis===0?b.minX:b.minY,end=axis===0?b.maxX:b.maxY;
+            ctx.strokeStyle='#d97706';ctx.setLineDash([4,3]);
+            if(width>0) for(let v=start+width,n=0;v<end&&n<1000;v+=width,n++) {
+                ctx.beginPath();
+                if(axis===0){ctx.moveTo(x+(v-b.minX)*scale,y);ctx.lineTo(x+(v-b.minX)*scale,canvas.height);}
+                else{ctx.moveTo(x,y+(v-b.minY)*scale);ctx.lineTo(canvas.width,y+(v-b.minY)*scale);}
+                ctx.stroke();
             }
+            ctx.restore();
         }
 
         function drawArrow(ctx, fromX, fromY, toX, toY) {
