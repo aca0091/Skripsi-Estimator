@@ -75,8 +75,14 @@
 }
 
 @keyframes fadeInTab {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* --- 2. Form Fields & Grid Layouts --- */
@@ -112,7 +118,9 @@
     background: #ffffff;
     box-sizing: border-box;
     font-family: inherit;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .form-ctrl:focus {
@@ -153,7 +161,9 @@
     text-align: center;
     cursor: pointer;
     margin-bottom: 18px;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .upload-dropzone:hover {
@@ -190,9 +200,18 @@
     gap: 4px;
 }
 
-.legend-badge.wall { background: #dcfce7; color: #166534; }
-.legend-badge.obstacle { background: #fee2e2; color: #991b1b; }
-.legend-badge.seam { background: #fef3c7; color: #92400e; }
+.legend-badge.wall {
+    background: #dcfce7;
+    color: #166534;
+}
+.legend-badge.obstacle {
+    background: #fee2e2;
+    color: #991b1b;
+}
+.legend-badge.seam {
+    background: #fef3c7;
+    color: #92400e;
+}
 
 /* --- 4. Pemilihan Metode Pemasangan (Tahap 3) --- */
 .method-box-container {
@@ -221,7 +240,7 @@
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
 }
 
-.method-select-card input[type="radio"] {
+.method-select-card input[type='radio'] {
     margin-right: 8px;
     accent-color: #2563eb;
 }
@@ -313,7 +332,7 @@
     margin-top: 12px;
 }
 
-.result-table-box th, 
+.result-table-box th,
 .result-table-box td {
     padding: 11px 14px;
     font-size: 13px;
@@ -413,8 +432,14 @@
 }
 
 @keyframes modalPop {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .modal-header {

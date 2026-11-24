@@ -5,7 +5,7 @@
     --card-bg: #ffffff;
     --text-primary: #1e293b;
     --text-secondary: #64748b;
-    --blue-accent: #4285F4;
+    --blue-accent: #4285f4;
     --border-subtle: #e2e8f0;
 }
 
@@ -13,7 +13,13 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+        'Inter',
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        Roboto,
+        sans-serif;
 }
 
 body {
@@ -83,7 +89,8 @@ body {
     transition: 0.2s;
 }
 
-.nav-link:hover, .nav-link.active {
+.nav-link:hover,
+.nav-link.active {
     background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
 }
@@ -111,8 +118,14 @@ body {
     justify-content: center;
 }
 
-.p-name { font-size: 13px; font-weight: 600; }
-.p-email { font-size: 11px; color: #94a3b8; }
+.p-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+.p-email {
+    font-size: 11px;
+    color: #94a3b8;
+}
 
 /* Main Section */
 .main-body {
@@ -146,7 +159,7 @@ body {
     background: var(--card-bg);
     padding: 22px 18px;
     border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     text-align: center;
 }
 
@@ -186,7 +199,7 @@ body {
     background: var(--card-bg);
     border-radius: 12px;
     padding: 22px 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .box-title {
@@ -213,10 +226,25 @@ body {
     align-items: center;
 }
 
-.est-code { font-size: 13px; font-weight: 700; color: #1e293b; }
-.est-room { font-size: 12px; color: #475569; margin-top: 2px; }
-.est-date { font-size: 11px; color: #94a3b8; }
-.est-cost { font-size: 13px; font-weight: 700; color: #000; }
+.est-code {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+}
+.est-room {
+    font-size: 12px;
+    color: #475569;
+    margin-top: 2px;
+}
+.est-date {
+    font-size: 11px;
+    color: #94a3b8;
+}
+.est-cost {
+    font-size: 13px;
+    font-weight: 700;
+    color: #000;
+}
 
 /* Summary */
 .summary-columns {
@@ -226,29 +254,129 @@ body {
     padding-top: 8px;
 }
 
-.s-label { font-size: 11px; color: var(--text-secondary); }
-.s-val { font-size: 20px; font-weight: 800; color: #000; margin-top: 4px; }
-.s-biaya { color: #000; }
+.s-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.s-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #000;
+    margin-top: 4px;
+}
+.s-biaya {
+    color: #000;
+}
 /* Shared navigation across all application pages. */
-.sidebar { width: 250px; }
-.sidebar .brand { padding: 26px 20px; gap: 12px; }
-.sidebar .brand-icon { width: 42px; height: 42px; max-width: 42px; object-fit: contain; }
-.sidebar .brand-title { font-size: 12px; line-height: 1.5; letter-spacing: .7px; }
-.sidebar .brand-title span { display: block; margin-top: 3px; color: #94a3b8; font-size: 11px; font-weight: 400; letter-spacing: 0; }
-.sidebar .nav-menu { padding: 12px 14px; }
-.nav-caption { padding: 0 14px 12px; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: #78849e; }
-.sidebar .nav-link { min-height: 46px; gap: 12px; border: 0; margin-bottom: 6px; padding: 12px 14px; font-size: 13px; }
-.sidebar .nav-link.active { background: #22234e; color: #fff; box-shadow: inset 3px 0 #6797ff; }
-.sidebar .nav-link:hover { background: #1a1d39; }
-.sidebar-icon { display: block; width: 20px; height: 20px; flex: 0 0 20px; }
-.sidebar .nav-link .sidebar-icon { color: #94a3b8; }
-.sidebar .nav-link.active .sidebar-icon { color: #8eb1ff; }
-.sidebar-footer { margin-top: auto; padding: 16px 14px; border-top: 1px solid rgba(255,255,255,.08); }
-.sidebar .user-profile { padding: 0 6px 16px; border: 0; min-width: 0; }
-.sidebar .avatar { width: 36px; height: 36px; flex: 0 0 36px; background: #202941; color: #a8bce1; }
-.sidebar .profile-info { min-width: 0; }
-.sidebar .p-name, .sidebar .p-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar .p-email { margin-top: 4px; }
-.sidebar-logout { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 14px; border: 1px solid #503040; border-radius: 8px; color: #f4a4ac; text-decoration: none; font-size: 12px; }
-.sidebar-logout:hover { background: #352033; }
-.sidebar a:focus-visible { outline: 2px solid #8eb1ff; outline-offset: 3px; }
+.sidebar {
+    width: 250px;
+}
+.sidebar .brand {
+    padding: 26px 20px;
+    gap: 12px;
+}
+.sidebar .brand-icon {
+    width: 42px;
+    height: 42px;
+    max-width: 42px;
+    object-fit: contain;
+}
+.sidebar .brand-title {
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.7px;
+}
+.sidebar .brand-title span {
+    display: block;
+    margin-top: 3px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+.sidebar .nav-menu {
+    padding: 12px 14px;
+}
+.nav-caption {
+    padding: 0 14px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    color: #78849e;
+}
+.sidebar .nav-link {
+    min-height: 46px;
+    gap: 12px;
+    border: 0;
+    margin-bottom: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+}
+.sidebar .nav-link.active {
+    background: #22234e;
+    color: #fff;
+    box-shadow: inset 3px 0 #6797ff;
+}
+.sidebar .nav-link:hover {
+    background: #1a1d39;
+}
+.sidebar-icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+}
+.sidebar .nav-link .sidebar-icon {
+    color: #94a3b8;
+}
+.sidebar .nav-link.active .sidebar-icon {
+    color: #8eb1ff;
+}
+.sidebar-footer {
+    margin-top: auto;
+    padding: 16px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sidebar .user-profile {
+    padding: 0 6px 16px;
+    border: 0;
+    min-width: 0;
+}
+.sidebar .avatar {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    background: #202941;
+    color: #a8bce1;
+}
+.sidebar .profile-info {
+    min-width: 0;
+}
+.sidebar .p-name,
+.sidebar .p-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sidebar .p-email {
+    margin-top: 4px;
+}
+.sidebar-logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid #503040;
+    border-radius: 8px;
+    color: #f4a4ac;
+    text-decoration: none;
+    font-size: 12px;
+}
+.sidebar-logout:hover {
+    background: #352033;
+}
+.sidebar a:focus-visible {
+    outline: 2px solid #8eb1ff;
+    outline-offset: 3px;
+}

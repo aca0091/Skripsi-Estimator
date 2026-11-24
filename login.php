@@ -5,7 +5,7 @@ require_once __DIR__ . '/require.php';
 // Jika sudah login, langsung arahkan ke dashboard
 if (is_authenticated()) {
     header('Location: dashboard.php');
-    exit;
+    exit();
 }
 
 $error = '';
@@ -17,25 +17,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($username) || empty($password)) {
         $error = 'Username dan password wajib diisi!';
     } else {
-        $stmt = $pdo->prepare(
-            "SELECT * FROM tb_user WHERE username = ? LIMIT 1"
-        );
+        $stmt = $pdo->prepare('SELECT * FROM tb_user WHERE username = ? LIMIT 1');
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Membandingkan password secara langsung (plain text)
         if ($user && $password === $user['password']) {
-
             session_regenerate_id(true);
             $_SESSION['user_logged_in'] = true;
-            $_SESSION['user_id']        = $user['id_user'];
-            $_SESSION['user_role']      = $user['role'];
-            $_SESSION['user_name']      = $user['nama_lengkap'];
-            $_SESSION['user_email']     = $user['email'];
+            $_SESSION['user_id'] = $user['id_user'];
+            $_SESSION['user_role'] = $user['role'];
+            $_SESSION['user_name'] = $user['nama_lengkap'];
+            $_SESSION['user_email'] = $user['email'];
 
             header('Location: dashboard.php');
-            exit;
-
+            exit();
         } else {
             $error = 'Username atau Password yang Anda masukkan salah!';
         }
@@ -73,55 +69,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 16px;
             color: #64748b;
         }
+
     </style>
+    <link rel="stylesheet" href="assets/css/form-polish.css?v=20261124-1">
 </head>
 
 <body>
     <div class="auth-card">
 
         <div class="auth-header">
-            <div class="logo"><img src="assets/images/logo_estimasi.png" alt="Logo CV. Plastik Indah"></div>
+            <div class="logo"><img src="assets/images/logo_estimasi.png"
+                    alt="Logo CV. Plastik Indah"></div>
             <h2>Carpet Estimator</h2>
             <p>Sistem Pengukuran & Estimasi CV. Plastik Indah</p>
         </div>
 
         <?php if (!empty($error)): ?>
-            <div class="alert-box">
-                <?= htmlspecialchars($error) ?>
-            </div>
+        <div class="alert-box">
+            <?= htmlspecialchars($error) ?>
+        </div>
         <?php endif; ?>
 
         <form method="POST" autocomplete="off">
 
             <div class="form-group">
                 <label>Username</label>
-                <input
-                    type="text"
-                    name="username"
-                    placeholder="Masukkan username Anda"
-                    value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
-                    required
-                    autofocus
-                >
+                <input type="text" name="username" placeholder="Masukkan username Anda"
+                    value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required autofocus>
             </div>
 
             <div class="form-group">
                 <label>Password</label>
 
                 <div class="pwd-wrapper">
-                    <input
-                        type="password"
-                        id="loginPassword"
-                        name="password"
-                        placeholder="Masukkan password Anda"
-                        required
-                    >
+                    <input type="password" id="loginPassword" name="password"
+                        placeholder="Masukkan password Anda" required>
 
-                    <button
-                        type="button"
-                        class="toggle-btn"
-                        onclick="togglePass('loginPassword', this)"
-                    >👁️</button>
+                    <button type="button" class="toggle-btn"
+                        onclick="togglePass('loginPassword', this)">👁️</button>
                 </div>
             </div>
 
@@ -139,6 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+        // Menampilkan atau menyembunyikan kata sandi.
         function togglePass(inputId, btn) {
             const input = document.getElementById(inputId);
 
@@ -150,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 btn.innerText = "👁️";
             }
         }
+
     </script>
 
 </body>

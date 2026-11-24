@@ -5,9 +5,9 @@ check_page_access('cetak_laporan.php');
 require_once __DIR__ . '/require.php';
 require_once __DIR__ . '/customer_helpers.php';
 
-$tglMulai     = isset($_GET['tgl_mulai']) ? $_GET['tgl_mulai'] : date('Y-m-01');
-$tglSelesai   = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d');
-$filterKarpet = isset($_GET['id_karpet']) ? (int)$_GET['id_karpet'] : 0;
+$tglMulai = isset($_GET['tgl_mulai']) ? $_GET['tgl_mulai'] : date('Y-m-01');
+$tglSelesai = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d');
+$filterKarpet = isset($_GET['id_karpet']) ? (int) $_GET['id_karpet'] : 0;
 $filterMetode = isset($_GET['metode']) ? $_GET['metode'] : '';
 
 $sql = "
@@ -21,31 +21,37 @@ $sql = "
 $params = [$tglMulai, $tglSelesai];
 
 if ($filterKarpet > 0) {
-    $sql .= " AND e.id_karpet = ?";
+    $sql .= ' AND e.id_karpet = ?';
     $params[] = $filterKarpet;
 }
 
 if ($filterMetode !== '') {
-    $sql .= " AND e.metode_pemasangan = ?";
+    $sql .= ' AND e.metode_pemasangan = ?';
     $params[] = $filterMetode;
 }
 
-$sql .= " ORDER BY e.tanggal_estimasi ASC, e.id_estimasi ASC";
+$sql .= ' ORDER BY e.tanggal_estimasi ASC, e.id_estimasi ASC';
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $dataLaporan = $stmt->fetchAll();
-$customerReport = customer_report($pdo, $tglMulai, $tglSelesai, $filterKarpet, $filterMetode);
+$customerReport = customer_report(
+    $pdo,
+    $tglMulai,
+    $tglSelesai,
+    $filterKarpet,
+    $filterMetode
+);
 
-$totMeterLari  = 0;
+$totMeterLari = 0;
 $totLuasBersih = 0;
-$totWaste      = 0;
-$totBiaya      = 0;
+$totWaste = 0;
+$totBiaya = 0;
 
 foreach ($dataLaporan as $row) {
-    $totMeterLari  += $row['total_meter_lari'];
+    $totMeterLari += $row['total_meter_lari'];
     $totLuasBersih += $row['total_luas'];
-    $totWaste      += $row['luas_waste'];
-    $totBiaya      += $row['total_biaya'];
+    $totWaste += $row['luas_waste'];
+    $totBiaya += $row['total_biaya'];
 }
 ?>
 <!DOCTYPE html>
@@ -87,7 +93,7 @@ foreach ($dataLaporan as $row) {
             width: 297mm;
             min-height: 210mm;
             padding: 12mm 16mm;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
             position: relative;
         }
 
@@ -141,7 +147,8 @@ foreach ($dataLaporan as $row) {
             font-size: 9.5pt;
         }
 
-        .report-table th, .report-table td {
+        .report-table th,
+        .report-table td {
             border: 1px solid var(--border-table);
             padding: 5px 6px;
         }
@@ -152,8 +159,13 @@ foreach ($dataLaporan as $row) {
             text-align: center;
         }
 
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
 
         .report-summary-box {
             display: flex;
@@ -204,18 +216,40 @@ foreach ($dataLaporan as $row) {
             border-radius: 6px;
             border: none;
             cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
-        .btn-print { background: var(--brand-color); color: #fff; }
-        .btn-back { background: #475569; color: #fff; }
+        .btn-print {
+            background: var(--brand-color);
+            color: #fff;
+        }
+
+        .btn-back {
+            background: #475569;
+            color: #fff;
+        }
 
         @media print {
-            body { background: #fff; padding: 0; }
-            .page-landscape { box-shadow: none; padding: 8mm 12mm; width: 100%; }
-            .no-print { display: none; }
-            @page { size: landscape; }
+            body {
+                background: #fff;
+                padding: 0;
+            }
+
+            .page-landscape {
+                box-shadow: none;
+                padding: 8mm 12mm;
+                width: 100%;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            @page {
+                size: landscape;
+            }
         }
+
     </style>
     <link rel="stylesheet" href="assets/css/customer.css">
 </head>
@@ -223,7 +257,8 @@ foreach ($dataLaporan as $row) {
 
     <div class="no-print">
         <a href="laporan.php" class="btn-action btn-back">⬅ Kembali</a>
-        <button onclick="window.print()" class="btn-action btn-print">🖨️ Cetak / Simpan PDF</button>
+        <button onclick="window.print()" class="btn-action btn-print">🖨️ Cetak / Simpan
+            PDF</button>
     </div>
 
     <div class="page-landscape">
@@ -239,9 +274,10 @@ foreach ($dataLaporan as $row) {
             </div>
         </div>
 
-        <div class="doc-title">LAPORAN REKAPITULASI ESTIMASI & PENGGUNAAN BAHAN FINISHING (KARPET)</div>
+        <div class="doc-title">LAPORAN REKAPITULASI ESTIMASI & PENGGUNAAN BAHAN FINISHING
+            (KARPET)</div>
         <div class="doc-period">
-            Periode: <?= date('d/m/Y', strtotime($tglMulai)) ?> s/d <?= date('d/m/Y', strtotime($tglSelesai)) ?>
+            Periode: <?= date('d/m/Y', strtotime($tglMulai)) ?> s/d <?= date( 'd/m/Y', strtotime($tglSelesai) ) ?>
         </div>
 
         <table class="report-table">
@@ -262,25 +298,26 @@ foreach ($dataLaporan as $row) {
             </thead>
             <tbody>
                 <?php if (empty($dataLaporan)): ?>
-                    <tr>
-                        <td colspan="11" class="text-center" style="padding: 20px;">Tidak ada transaksi estimasi pada periode ini.</td>
-                    </tr>
+                <tr>
+                    <td colspan="11" class="text-center" style="padding: 20px;">Tidak ada
+                        transaksi estimasi pada periode ini.</td>
+                </tr>
                 <?php else: ?>
-                    <?php $no = 1; foreach ($dataLaporan as $row): ?>
-                        <tr>
-                            <td class="text-center"><?= $no++ ?></td>
-                            <td><strong><?= htmlspecialchars($row['kode_estimasi']) ?></strong></td>
-                            <td class="text-center"><?= date('d/m/Y', strtotime($row['tanggal_estimasi'])) ?></td>
-                            <td><?= htmlspecialchars($row['nama_pelanggan']) ?></td>
-                            <td><?= htmlspecialchars($row['nama_ruangan']) ?></td>
-                            <td><?= htmlspecialchars($row['nama_karpet']) ?></td>
-                            <td class="text-center"><?= htmlspecialchars($row['arah_pemasangan']) ?></td>
-                            <td class="text-center"><?= htmlspecialchars($row['metode_pemasangan']) ?></td>
-                            <td class="text-center"><?= number_format($row['total_meter_lari'], 1) ?> m</td>
-                            <td class="text-center"><?= number_format($row['luas_waste'], 1) ?> m²</td>
-                            <td class="text-right">Rp <?= number_format($row['total_biaya'], 0, ',', '.') ?></td>
-                        </tr>
-                    <?php endforeach; ?>
+                <?php $no = 1; foreach ($dataLaporan as $row): ?>
+                <tr>
+                    <td class="text-center"><?= $no++ ?></td>
+                    <td><strong><?= htmlspecialchars( $row['kode_estimasi'] ) ?></strong></td>
+                    <td class="text-center"><?= date( 'd/m/Y', strtotime($row['tanggal_estimasi']) ) ?></td>
+                    <td><?= htmlspecialchars($row['nama_pelanggan']) ?></td>
+                    <td><?= htmlspecialchars($row['nama_ruangan']) ?></td>
+                    <td><?= htmlspecialchars($row['nama_karpet']) ?></td>
+                    <td class="text-center"><?= htmlspecialchars( $row['arah_pemasangan'] ) ?></td>
+                    <td class="text-center"><?= htmlspecialchars( $row['metode_pemasangan'] ) ?></td>
+                    <td class="text-center"><?= number_format( $row['total_meter_lari'], 1 ) ?> m</td>
+                    <td class="text-center"><?= number_format( $row['luas_waste'], 1 ) ?> m²</td>
+                    <td class="text-right">Rp <?= number_format( $row['total_biaya'], 0, ',', '.' ) ?></td>
+                </tr>
+                <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
             <tfoot>
@@ -288,20 +325,26 @@ foreach ($dataLaporan as $row) {
                     <td colspan="8" class="text-right">TOTAL REKAPITULASI:</td>
                     <td class="text-center"><?= number_format($totMeterLari, 1) ?> m</td>
                     <td class="text-center"><?= number_format($totWaste, 1) ?> m²</td>
-                    <td class="text-right" style="color: var(--brand-color);">Rp <?= number_format($totBiaya, 0, ',', '.') ?></td>
+                    <td class="text-right" style="color: var(--brand-color);">Rp
+                        <?= number_format( $totBiaya, 0, ',', '.' ) ?></td>
                 </tr>
             </tfoot>
         </table>
-        <?php require __DIR__.'/includes/customer_report.php'; ?>
+        <?php require __DIR__ . '/includes/customer_report.php'; ?>
 
         <!-- RINGKASAN & TANDA TANGAN -->
         <div class="report-summary-box">
             <div class="summary-notes">
                 <strong>Catatan Laporan Operasional:</strong>
                 <ul style="margin-left: 18px; margin-top: 4px;">
-                    <li>Laporan ini merekapitulasi seluruh hasil kalkulasi matematis optimasi pemotongan karpet roll menggunakan <em>Integer Linear Programming</em>.</li>
-                    <li>Akumulasi kebutuhan meter lari roll utuh yang dipotong: <strong><?= number_format($totMeterLari, 1) ?> meter lari</strong>.</li>
-                    <li>Tingkat sisa potongan material (waste) terakumulasi sebesar <strong><?= number_format($totWaste, 1) ?> m²</strong> pada rentang periode yang dipilih.</li>
+                    <li>Laporan ini merekapitulasi seluruh hasil kalkulasi matematis
+                        optimasi pemotongan karpet roll menggunakan <em>Integer Linear
+                            Programming</em>.</li>
+                    <li>Akumulasi kebutuhan meter lari roll utuh yang dipotong:
+                        <strong><?= number_format( $totMeterLari, 1 ) ?> meter lari</strong>.</li>
+                    <li>Tingkat sisa potongan material (waste) terakumulasi sebesar
+                        <strong><?= number_format( $totWaste, 1 ) ?> m²</strong> pada rentang periode yang
+                        dipilih.</li>
                 </ul>
             </div>
 

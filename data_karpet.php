@@ -6,20 +6,22 @@ require_once __DIR__ . '/require.php';
 
 // Tambah Karpet Baru (Harga & Stok dalam Meter Panjang / Meter Lari)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_karpet'])) {
-    $kode   = trim($_POST['kode_karpet']);
-    $nama   = trim($_POST['nama_karpet']);
-    $lebar  = (float)$_POST['lebar_roll'];
-    $motif  = $_POST['motif'];
-    $harga  = (float)$_POST['harga_per_m_lari'];
-    $stok   = (float)$_POST['stok_meter_lari'];
+    $kode = trim($_POST['kode_karpet']);
+    $nama = trim($_POST['nama_karpet']);
+    $lebar = (float) $_POST['lebar_roll'];
+    $motif = $_POST['motif'];
+    $harga = (float) $_POST['harga_per_m_lari'];
+    $stok = (float) $_POST['stok_meter_lari'];
 
-    $stmt = $pdo->prepare("INSERT INTO tb_karpet (kode_karpet, nama_karpet, lebar_roll, motif, harga_per_m_lari, stok_meter_lari) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt = $pdo->prepare(
+        'INSERT INTO tb_karpet (kode_karpet, nama_karpet, lebar_roll, motif, harga_per_m_lari, stok_meter_lari) VALUES (?, ?, ?, ?, ?, ?)'
+    );
     $stmt->execute([$kode, $nama, $lebar, $motif, $harga, $stok]);
     header('Location: data_karpet.php');
-    exit;
+    exit();
 }
 
-$karpetList = $pdo->query("SELECT * FROM tb_karpet ORDER BY id_karpet DESC")->fetchAll();
+$karpetList = $pdo->query('SELECT * FROM tb_karpet ORDER BY id_karpet DESC')->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -29,16 +31,18 @@ $karpetList = $pdo->query("SELECT * FROM tb_karpet ORDER BY id_karpet DESC")->fe
     <link rel="icon" type="image/png" href="assets/images/logo_estimasi.png">
     <link rel="stylesheet" href="assets/css/dash.css?v=20261123-sidebar2">
     <link rel="stylesheet" href="assets/css/data_karpet.css">
-<link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
+    <link rel="stylesheet" href="assets/css/app-theme.css?v=20261123-1">
+    <link rel="stylesheet" href="assets/css/form-polish.css?v=20261124-1">
 </head>
 <body>
     <div class="app-layout">
         <?php $activePage = 'data_karpet'; require __DIR__ . '/includes/sidebar.php'; ?>
 
         <main class="main-body">
-<?php require __DIR__ . '/includes/app_toolbar.php'; ?>
+            <?php require __DIR__ . '/includes/app_toolbar.php'; ?>
             <h1 class="main-title">Data Karpet</h1>
-            <p class="breadcrumb">Kelola katalog, harga, dan ketersediaan karpet perusahaan.</p>
+            <p class="breadcrumb">Kelola katalog, harga, dan ketersediaan karpet
+                perusahaan.</p>
 
             <div class="karpet-grid">
                 <!-- Form Tambah -->
@@ -48,15 +52,18 @@ $karpetList = $pdo->query("SELECT * FROM tb_karpet ORDER BY id_karpet DESC")->fe
                         <input type="hidden" name="tambah_karpet" value="1">
                         <div class="form-group-k">
                             <label>Kode Karpet</label>
-                            <input type="text" name="kode_karpet" placeholder="Misal: KRP-05" required>
+                            <input type="text" name="kode_karpet"
+                                placeholder="Misal: KRP-05" required>
                         </div>
                         <div class="form-group-k">
                             <label>Nama Karpet</label>
-                            <input type="text" name="nama_karpet" placeholder="Misal: Santana Blue Pattern" required>
+                            <input type="text" name="nama_karpet"
+                                placeholder="Misal: Santana Blue Pattern" required>
                         </div>
                         <div class="form-group-k">
                             <label>Lebar Roll (Meter)</label>
-                            <input type="number" step="0.1" name="lebar_roll" value="4.0" required>
+                            <input type="number" step="0.1" name="lebar_roll" value="4.0"
+                                required>
                         </div>
                         <div class="form-group-k">
                             <label>Motif Karpet</label>
@@ -67,11 +74,13 @@ $karpetList = $pdo->query("SELECT * FROM tb_karpet ORDER BY id_karpet DESC")->fe
                         </div>
                         <div class="form-group-k">
                             <label>Harga per Meter Panjang / Meter Lari (Rp)</label>
-                            <input type="number" name="harga_per_m_lari" placeholder="Contoh: 480000" required>
+                            <input type="number" name="harga_per_m_lari"
+                                placeholder="Contoh: 480000" required>
                         </div>
                         <div class="form-group-k">
                             <label>Stok Meter Lari Tersedia (m)</label>
-                            <input type="number" step="0.1" name="stok_meter_lari" value="200" required>
+                            <input type="number" step="0.1" name="stok_meter_lari"
+                                value="200" required>
                         </div>
                         <button type="submit" class="btn-add">Simpan Data Karpet</button>
                     </form>
@@ -93,18 +102,21 @@ $karpetList = $pdo->query("SELECT * FROM tb_karpet ORDER BY id_karpet DESC")->fe
                         </thead>
                         <tbody>
                             <?php foreach ($karpetList as $k): ?>
-                                <?php 
-                                // Mendukung nama kolom baru maupun lama agar tidak error
-                                $hargaLari = $k['harga_per_m_lari'] ?? $k['harga_per_m2'] ?? 0;
-                                $stokLari  = $k['stok_meter_lari']  ?? $k['stok_m2'] ?? 0;
+                            <?php
+                            // Mendukung nama kolom baru maupun lama agar tidak error
+                            $hargaLari =
+                                $k['harga_per_m_lari'] ?? ($k['harga_per_m2'] ?? 0);
+                            $stokLari = $k['stok_meter_lari'] ?? ($k['stok_m2'] ?? 0);
                             ?>
                             <tr>
-                                <td><strong><?= htmlspecialchars($k['kode_karpet']) ?></strong></td>
+                                <td><strong><?= htmlspecialchars( $k['kode_karpet'] ) ?></strong></td>
                                 <td><?= htmlspecialchars($k['nama_karpet']) ?></td>
                                 <td><?= number_format($k['lebar_roll'], 2) ?> m</td>
-                                <td><span class="badge-m <?= strtolower($k['motif']) ?>"><?= htmlspecialchars($k['motif']) ?></span></td>
-                                <td>Rp <?= number_format($hargaLari, 0, ',', '.') ?> / m</td>
-                                <td><strong><?= number_format($stokLari, 1) ?> m lari</strong></td>
+                                <td><span
+                                        class="badge-m <?= strtolower( $k['motif'] ) ?>"><?= htmlspecialchars($k['motif']) ?></span>
+                                </td>
+                                <td>Rp <?= number_format( $hargaLari, 0, ',', '.' ) ?> / m</td>
+                                <td><strong><?= number_format( $stokLari, 1 ) ?> m lari</strong></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>

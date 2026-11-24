@@ -36,14 +36,14 @@ CREATE TABLE IF NOT EXISTS tb_ruangan (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS tb_customer (
- id_customer INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
- nama_customer VARCHAR(255) NOT NULL,
- kontak_person VARCHAR(255) NOT NULL DEFAULT '',
- telepon VARCHAR(50) NOT NULL DEFAULT '',
- email VARCHAR(255) NOT NULL DEFAULT '',
- alamat TEXT NOT NULL,
- tanggal_daftar DATE NOT NULL,
- INDEX(nama_customer)
+    id_customer INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    nama_customer VARCHAR(255) NOT NULL,
+    kontak_person VARCHAR(255) NOT NULL DEFAULT '',
+    telepon VARCHAR(50) NOT NULL DEFAULT '',
+    email VARCHAR(255) NOT NULL DEFAULT '',
+    alamat TEXT NOT NULL,
+    tanggal_daftar DATE NOT NULL,
+    INDEX(nama_customer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS tb_estimasi (

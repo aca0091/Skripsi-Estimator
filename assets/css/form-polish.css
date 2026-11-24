@@ -1,0 +1,46 @@
+/* Shared field depth, including fields created dynamically by the layout editor. */
+body :is(.main-body, .auth-card) :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="submit"]):not([type="button"]), select, textarea) {
+    border: 1px solid #dbe2ef;
+    border-radius: 10px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(30, 45, 83, .04), 0 5px 14px rgba(30, 45, 83, .055);
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+body :is(.main-body, .auth-card) :is(input, select, textarea):focus {
+    outline: none;
+    border-color: #8291e9;
+    box-shadow: 0 0 0 3px rgba(99, 118, 222, .13), 0 5px 16px rgba(53, 72, 135, .09);
+}
+body :is(.main-body, .auth-card) :is(input, textarea)[readonly] {
+    background-color: #f8faff;
+    color: #66738d;
+    box-shadow: 0 2px 6px rgba(30, 45, 83, .04);
+}
+body :is(.main-body, .auth-card) :is(input, select, textarea):disabled {
+    background-color: #f3f5f9;
+    color: #8490a5;
+    box-shadow: none;
+}
+.object-editor-panel {
+    margin: 20px 0;
+    padding: 22px;
+    border: 1px solid #e1e5f3;
+    border-radius: 14px;
+    background: #fbfcff;
+    box-shadow: 0 3px 12px rgba(30, 45, 83, .035);
+}
+.object-editor-panel h4 { font-size: 15px; font-weight: 650; color: #33415e; margin-bottom: 12px; }
+.object-editor-panel #detectedObjects > p { margin: 0 0 16px; font-size: 13px; color: #7b879e; line-height: 1.6; }
+.object-editor-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.object-editor-actions .btn-wizard { margin: 0; border-radius: 9px; font-size: 12px; padding: 11px 15px; }
+.object-editor-actions .btn-wizard:not(.btn-next) { border: 1px solid #dce3f0; background: #fff; color: #56647e; box-shadow: 0 2px 5px rgba(30,45,83,.04); }
+.object-editor-actions .btn-wizard:not(.btn-next):hover { background: #f0f3fc; }
+#objectDrawStatus:not(:empty) { margin-top: 14px; font-size: 13px; line-height: 1.6; color: #5367b8; }
+@media (max-width: 680px) {
+    .object-editor-panel { padding: 16px; }
+    .object-editor-actions .btn-wizard { flex: 1 1 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    body :is(.main-body, .auth-card) :is(input, select, textarea) { transition: none; }
+}
+.auto-dimensions-panel{margin:16px 0;padding:20px;border:1px solid #dbe3f5;border-radius:12px;background:#f8faff}.auto-dimensions-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.auto-dimensions-panel h4{font-size:14px;color:#344567}.auto-dimensions-panel p{font-size:12px;color:#71809b;line-height:1.7;margin-top:6px}.auto-dimensions-panel #autoDimensionsStatus:empty{display:none}#autoDimensionsPreview{margin-top:14px;padding-top:14px;border-top:1px solid #dfe6f4}#autoDimensionsPreview strong{font-size:15px;color:#405abe}#autoDimensionsPreview button{margin:12px 8px 0 0}

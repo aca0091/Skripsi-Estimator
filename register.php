@@ -6,11 +6,11 @@ $error = '';
 $role = 'karyawan';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nama     = trim($_POST['nama_lengkap'] ?? '');
-    $email    = trim($_POST['email'] ?? '');
+    $nama = trim($_POST['nama_lengkap'] ?? '');
+    $email = trim($_POST['email'] ?? '');
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
-    $konfirm  = $_POST['konfirmasi_password'] ?? '';
+    $konfirm = $_POST['konfirmasi_password'] ?? '';
 
     $role = $_POST['role'] ?? '';
 
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         // Cek duplikasi username atau email
         $stmtCheck = $pdo->prepare(
-            "SELECT id_user FROM tb_user WHERE username = ? OR email = ?"
+            'SELECT id_user FROM tb_user WHERE username = ? OR email = ?'
         );
         $stmtCheck->execute([$username, $email]);
 
@@ -62,10 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             align-items: center;
         }
+
         .pwd-wrapper input {
             width: 100%;
             padding-right: 40px;
         }
+
         .toggle-btn {
             position: absolute;
             right: 10px;
@@ -75,37 +77,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 16px;
             color: #64748b;
         }
+
     </style>
+    <link rel="stylesheet" href="assets/css/form-polish.css?v=20261124-1">
 </head>
 <body>
     <div class="auth-card">
         <div class="auth-header">
-            <div class="logo"><img src="assets/images/logo_estimasi.png" alt="Logo CV. Plastik Indah"></div>
+            <div class="logo"><img src="assets/images/logo_estimasi.png"
+                    alt="Logo CV. Plastik Indah"></div>
             <h2>Daftar Akun Baru</h2>
             <p>Buat akun dan tentukan kata sandi Anda sendiri</p>
         </div>
 
         <?php if (!empty($error)): ?>
-            <div class="alert-box error"><?= htmlspecialchars($error) ?></div>
+        <div class="alert-box error"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
         <?php if (!empty($success)): ?>
-            <div class="alert-box success"><?= htmlspecialchars($success) ?></div>
+        <div class="alert-box success"><?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
 
         <form method="POST" autocomplete="off">
             <div class="form-group">
                 <label>Nama Lengkap</label>
-                <input type="text" name="nama_lengkap" placeholder="Masukkan nama lengkap" value="<?= htmlspecialchars($_POST['nama_lengkap'] ?? '') ?>" required>
+                <input type="text" name="nama_lengkap" placeholder="Masukkan nama lengkap"
+                    value="<?= htmlspecialchars( $_POST['nama_lengkap'] ?? '' ) ?>" required>
             </div>
-            
+
             <div class="form-group">
                 <label>Email Perusahaan / Staf</label>
-                <input type="email" name="email" placeholder="contoh@plastikindah.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
+                <input type="email" name="email" placeholder="contoh@plastikindah.com"
+                    value="<?= htmlspecialchars( $_POST['email'] ?? '' ) ?>" required>
             </div>
 
             <div class="form-group">
                 <label>Username</label>
-                <input type="text" name="username" placeholder="Buat username unik" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required>
+                <input type="text" name="username" placeholder="Buat username unik"
+                    value="<?= htmlspecialchars( $_POST['username'] ?? '' ) ?>" required>
             </div>
 
             <div class="form-group">
@@ -114,22 +122,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <option value="karyawan" <?= $role === 'karyawan' ? 'selected' : '' ?>>Karyawan</option>
                     <option value="owner" <?= $role === 'owner' ? 'selected' : '' ?>>Owner</option>
                 </select>
-                <p id="role-help" style="font-size: 12px; color: #64748b; margin-top: 6px;">Karyawan: seluruh fitur. Owner: Dashboard dan Laporan.</p>
+                <p id="role-help"
+                    style="font-size: 12px; color: #64748b; margin-top: 6px;">Karyawan:
+                    seluruh fitur. Owner: Dashboard dan Laporan.</p>
             </div>
 
             <div class="form-group">
                 <label>Password Pilihan Anda</label>
                 <div class="pwd-wrapper">
-                    <input type="password" id="regPassword" name="password" placeholder="Ketik password sendiri (min. 6 digit)" required>
-                    <button type="button" class="toggle-btn" onclick="togglePass('regPassword', this)">👁️</button>
+                    <input type="password" id="regPassword" name="password"
+                        placeholder="Ketik password sendiri (min. 6 digit)" required>
+                    <button type="button" class="toggle-btn"
+                        onclick="togglePass('regPassword', this)">👁️</button>
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Ulangi Password</label>
                 <div class="pwd-wrapper">
-                    <input type="password" id="regConfirm" name="konfirmasi_password" placeholder="Ketik ulang password yang sama" required>
-                    <button type="button" class="toggle-btn" onclick="togglePass('regConfirm', this)">👁️</button>
+                    <input type="password" id="regConfirm" name="konfirmasi_password"
+                        placeholder="Ketik ulang password yang sama" required>
+                    <button type="button" class="toggle-btn"
+                        onclick="togglePass('regConfirm', this)">👁️</button>
                 </div>
             </div>
 
@@ -142,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+        // Menampilkan atau menyembunyikan kata sandi.
         function togglePass(inputId, btn) {
             const input = document.getElementById(inputId);
             if (input.type === "password") {
@@ -152,6 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 btn.innerText = "👁️";
             }
         }
+
     </script>
 </body>
 </html>
