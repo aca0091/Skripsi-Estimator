@@ -4,13 +4,24 @@ require_once __DIR__ . '/auth.php';
 check_page_access('riwayat_estimasi.php');
 require_once __DIR__ . '/require.php';
 
-// Handle Hapus Riwayat Estimasi
-if (isset($_GET['hapus'])) {
-    $idHapus = (int) $_GET['hapus'];
-    $stmtDel = $pdo->prepare('DELETE FROM tb_estimasi WHERE id_estimasi = ?');
-    $stmtDel->execute([$idHapus]); // <-- Menggunakan tanda panah objek ($stmtDel->execute)
-    header('Location: riwayat_estimasi.php');
-    exit();
+require_once __DIR__ . '/quotation_helpers.php';
+// Penghapusan satu penawaran beserta seluruh estimasinya dilakukan atomik.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['hapus'])) {
+    quotation_check_token();
+    $pdo->beginTransaction();
+    try {
+        $find = $pdo->prepare('SELECT id_penawaran FROM tb_estimasi WHERE id_estimasi=? FOR UPDATE');
+        $find->execute([(int) $_POST['hapus']]);
+        $parent = $find->fetchColumn();
+        if ($parent) {
+            $pdo->prepare('DELETE FROM tb_estimasi WHERE id_penawaran=?')->execute([$parent]);
+            $pdo->prepare('DELETE FROM tb_penawaran WHERE id_penawaran=?')->execute([$parent]);
+        } else {
+            $pdo->prepare('DELETE FROM tb_estimasi WHERE id_estimasi=?')->execute([(int) $_POST['hapus']]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    header('Location: riwayat_estimasi.php'); exit;
 }
 
 // Logika Pencarian & Filter Tanggal / Pelanggan
@@ -18,10 +29,18 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $bulanFilter = isset($_GET['bulan']) ? trim($_GET['bulan']) : '';
 
 $sql = "
-    SELECT e.*, r.nama_ruangan, r.nama_pelanggan, k.nama_karpet 
+    SELECT e.*, r.nama_ruangan, r.nama_pelanggan, k.nama_karpet, q.kode_penawaran, q.total_biaya AS total_penawaran, g.rooms, g.carpets, g.room_count, g.area_sum, g.waste_sum
     FROM tb_estimasi e
     JOIN tb_ruangan r ON e.id_ruangan = r.id_ruangan
     JOIN tb_karpet k ON e.id_karpet = k.id_karpet
+    LEFT JOIN tb_penawaran q ON q.id_penawaran=e.id_penawaran
+    LEFT JOIN (
+        SELECT x.id_penawaran, GROUP_CONCAT(r2.nama_ruangan ORDER BY x.id_estimasi SEPARATOR ', ') rooms,
+        GROUP_CONCAT(DISTINCT k2.nama_karpet ORDER BY k2.nama_karpet SEPARATOR ', ') carpets,
+        COUNT(*) room_count, SUM(x.total_luas) area_sum, SUM(x.luas_waste) waste_sum
+        FROM tb_estimasi x JOIN tb_ruangan r2 ON r2.id_ruangan=x.id_ruangan JOIN tb_karpet k2 ON k2.id_karpet=x.id_karpet
+        WHERE x.id_penawaran IS NOT NULL GROUP BY x.id_penawaran
+    ) g ON g.id_penawaran=e.id_penawaran
     WHERE 1=1
 ";
 $params = [];
@@ -41,7 +60,23 @@ if ($bulanFilter !== '') {
 $sql .= ' ORDER BY e.id_estimasi DESC';
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$riwayatList = $stmt->fetchAll();
+$riwayatList = [];
+$seen = [];
+foreach ($stmt->fetchAll() as $row) {
+    if ($row['id_penawaran']) {
+        if (isset($seen[$row['id_penawaran']])) continue;
+        $seen[$row['id_penawaran']] = true;
+        $row['kode_estimasi'] = $row['kode_penawaran'];
+        $row['nama_ruangan'] = $row['rooms'];
+        $row['nama_karpet'] = $row['carpets'];
+        $row['total_biaya'] = $row['total_penawaran'];
+        $row['total_luas'] = $row['area_sum'];
+        $row['luas_waste'] = $row['waste_sum'];
+        $row['arah_pemasangan'] = $row['room_count'] . ' estimasi';
+        $row['metode_pemasangan'] = 'Lihat rincian';
+    }
+    $riwayatList[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -149,10 +184,9 @@ $riwayatList = $stmt->fetchAll();
                                                 <path
                                                     d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5" />
                                             </svg> PDF</a>
-                                        <a href="riwayat_estimasi.php?hapus=<?= $row[ 'id_estimasi' ] ?>"
-                                            class="btn-icon-action btn-del-history"
-                                            onclick="return confirm('Hapus arsip riwayat estimasi ini?')"
-                                            title="Hapus Arsip"><svg class="ui-icon"
+                                        <form method="post" onsubmit="return confirm('Hapus penawaran ini beserta seluruh estimasinya?')">
+                                            <input type="hidden" name="csrf" value="<?= quotation_token() ?>">
+                                            <button type="submit" name="hapus" value="<?= (int) $row['id_estimasi'] ?>" class="btn-icon-action btn-del-history" title="Hapus Arsip"><svg class="ui-icon"
                                                 viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="1.7"
                                                 stroke-linecap="round"
@@ -160,7 +194,7 @@ $riwayatList = $stmt->fetchAll();
                                                 aria-hidden="true">
                                                 <path
                                                     d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
-                                            </svg></a>
+                                            </svg></button></form>
                                     </div>
                                 </td>
                             </tr>

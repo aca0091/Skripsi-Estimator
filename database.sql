@@ -46,6 +46,17 @@ CREATE TABLE IF NOT EXISTS tb_customer (
     INDEX(nama_customer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS tb_penawaran (
+ id_penawaran INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ kode_penawaran VARCHAR(100) UNIQUE DEFAULT NULL,
+ id_customer INT UNSIGNED NOT NULL,
+ nama_pelanggan VARCHAR(255) NOT NULL,
+ tanggal_penawaran DATE NOT NULL,
+ pricing_snapshot JSON NOT NULL,
+ total_biaya DECIMAL(18,2) NOT NULL,
+ FOREIGN KEY (id_customer) REFERENCES tb_customer(id_customer) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS tb_estimasi (
     id_estimasi INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     kode_estimasi VARCHAR(100) NOT NULL,
@@ -66,6 +77,11 @@ CREATE TABLE IF NOT EXISTS tb_estimasi (
     total_biaya DECIMAL(18,2) NOT NULL DEFAULT 0,
     tanggal_estimasi DATE NOT NULL,
     layout_geometry JSON DEFAULT NULL,
+    pricing_snapshot JSON DEFAULT NULL,
+    layout_image MEDIUMTEXT DEFAULT NULL,
+    id_penawaran INT UNSIGNED DEFAULT NULL,
+    INDEX idx_penawaran (id_penawaran),
+    CONSTRAINT fk_estimasi_penawaran FOREIGN KEY (id_penawaran) REFERENCES tb_penawaran(id_penawaran) ON DELETE RESTRICT,
     INDEX (id_ruangan),
     INDEX (id_karpet),
     INDEX (id_user),

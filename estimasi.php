@@ -3,6 +3,16 @@
 require_once __DIR__ . '/auth.php';
 check_page_access('estimasi.php');
 require_once __DIR__ . '/require.php';
+require_once __DIR__ . '/pricing.php';
+
+require_once __DIR__ . '/quotation_helpers.php';
+$draftKey = $_POST['draft'] ?? $_GET['draft'] ?? bin2hex(random_bytes(16));
+if (!is_string($draftKey) || !preg_match('/^[a-f0-9]{32}$/D', $draftKey)) { http_response_code(400); exit('Draft tidak valid.'); }
+if (!isset($_SESSION['quotations'][$draftKey])) {
+    if (isset($_POST['draft']) || isset($_GET['draft'])) { http_response_code(409); exit('Draft sudah disimpan atau kedaluwarsa. Buka Estimasi untuk membuat penawaran baru.'); }
+    $_SESSION['quotations'][$draftKey] = ['rows' => []];
+}
+$draft =& $_SESSION['quotations'][$draftKey];
 
 // 1. Ambil Katalog Karpet
 $stmtK = $pdo->query('SELECT * FROM tb_karpet ORDER BY nama_karpet ASC');
@@ -19,6 +29,11 @@ if (
     isset($_POST['action']) &&
     $_POST['action'] === 'save_final_estimate'
 ) {
+    quotation_check_token();
+    if (!empty($draft['rows'])) {
+        $_POST['id_customer'] = $draft['customer'];
+        $_POST['tanggal_estimasi'] = $draft['date'];
+    }
     $idCustomer = filter_var($_POST['id_customer'] ?? null, FILTER_VALIDATE_INT);
     $stmtCustomer = $pdo->prepare(
         'SELECT nama_customer FROM tb_customer WHERE id_customer=?'
@@ -77,65 +92,64 @@ if (
     $luasKotor = $geometry['area'];
     $totalLuas = $luasKotor - $luasObjek;
     $totalObras = $metodePasang === 'Permanen' ? 0 : $geometry['perimeter'];
-    $pdo->beginTransaction();
-    // Simpan batas ruangan bersama estimasi agar cetak memakai bentuk yang sama.
-    $stmtR = $pdo->prepare("
-        INSERT INTO tb_ruangan (nama_ruangan, nama_pelanggan, panjang, lebar, luas_objek, luas_kotor, luas_bersih)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ");
-    $stmtR->execute([
-        $namaRuangan,
-        $namaPelanggan,
-        $panjangRuang,
-        $lebarRuang,
-        $luasObjek,
-        $luasKotor,
-        $totalLuas
-    ]);
-    $idRuanganBaru = $pdo->lastInsertId();
-
-    // B. Buat kode transaksi estimasi
-    $stmtMax = $pdo->query('SELECT MAX(id_estimasi) AS max_id FROM tb_estimasi');
-    $nextId = ((int) ($stmtMax->fetch()['max_id'] ?? 0)) + 1;
-    $kodeEstimasi = 'EST - ' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
-
-    // C. Simpan estimasi
-    $stmtSave = $pdo->prepare("
-        INSERT INTO tb_estimasi (
-            kode_estimasi, id_ruangan, id_karpet, id_user, arah_pemasangan, metode_pemasangan,
-            total_luas, total_meter_lari, total_sambungan, total_obras, biaya_lem, biaya_jasa_pasang,
-            luas_waste, total_biaya, tanggal_estimasi, layout_geometry, id_customer
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-    $stmtSave->execute([
-        $kodeEstimasi,
-        $idRuanganBaru,
-        $idKarpet,
-        $idUser,
-        $arah,
-        $metodePasang,
-        $totalLuas,
-        $totalMeterLari,
-        $totalSambungan,
-        $totalObras,
-        $biayaLem,
-        $biayaJasaPasang,
-        $luasWaste,
-        $totalBiaya,
-        $tanggalEstimasi,
-        $geometry['json'],
-        $idCustomer
-    ]);
-
-    $lastId = $pdo->lastInsertId();
-    $pdo->commit();
-
-    if (isset($_POST['submit_type']) && $_POST['submit_type'] === 'save_and_print') {
-        header('Location: cetak_estimasi.php?id=' . $lastId);
-        exit();
+    try {
+        if (!in_array($metodePasang, ['Disambung', 'Permanen'], true)) {
+            throw new InvalidArgumentException('Metode pemasangan tidak valid.');
+        }
+        $carpetQuery = $pdo->prepare('SELECT harga_per_m_lari FROM tb_karpet WHERE id_karpet=?');
+        $carpetQuery->execute([$idKarpet]);
+        $carpetRate = $carpetQuery->fetchColumn();
+        if ($carpetRate === false) {
+            throw new InvalidArgumentException('Pilih karpet yang terdaftar.');
+        }
+        $items = ['karpet' => ['quantity' => $_POST['total_meter_lari'] ?? 0, 'rate' => $carpetRate]];
+        if ($metodePasang === 'Disambung') {
+            $items['sambung'] = ['quantity' => $_POST['total_sambungan'] ?? 0, 'rate' => $_POST['tarif_sambung'] ?? 25000];
+            $items['obras'] = ['quantity' => $totalObras, 'rate' => $_POST['tarif_obras'] ?? 15000];
+        } else {
+            $items['lem'] = ['quantity' => $totalLuas, 'rate' => $_POST['tarif_lem'] ?? 0];
+            $items['pasang'] = ['quantity' => $totalLuas, 'rate' => $_POST['tarif_pasang'] ?? 0];
+        }
+        if (!is_array($_POST['discount'] ?? [])) {
+            throw new InvalidArgumentException('Format diskon tidak valid.');
+        }
+        $discounts = $_POST['discount'] ?? [];
+        unset($discounts['total']);
+        $pricing = calculate_pricing($items, $discounts);
+        $totalBiaya = $pricing['total'];
+        $biayaLem = $pricing['items']['lem']['gross'] ?? 0;
+        $biayaJasaPasang = $pricing['items']['pasang']['gross'] ?? 0;
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422);
+        exit(htmlspecialchars($error->getMessage(), ENT_QUOTES, 'UTF-8'));
     }
-
-    header('Location: dashboard.php');
+    try {
+        if ($namaRuangan === '' || strlen($namaRuangan) > 255) throw new InvalidArgumentException('Nama ruangan wajib diisi, maksimal 255 karakter.');
+        if (count($draft['rows']) >= 30) throw new InvalidArgumentException('Maksimal 30 estimasi per penawaran.');
+        if (!in_array($arah, ['Vertikal', 'Horizontal'], true)) throw new InvalidArgumentException('Arah pemasangan tidak valid.');
+        $image = $_POST['layout_image'] ?? '';
+        if (!is_string($image) || strlen($image) > 1500000) throw new InvalidArgumentException('Gambar denah terlalu besar.');
+        if ($image !== '') {
+            if (!preg_match('#^data:image/jpeg;base64,([A-Za-z0-9+/=]+)$#D', $image, $match)) throw new InvalidArgumentException('Format gambar denah tidak valid.');
+            $bytes = base64_decode($match[1], true);
+            $info = $bytes === false ? false : @getimagesizefromstring($bytes);
+            if (!$info || $info[2] !== IMAGETYPE_JPEG || $info[0] > 1200 || $info[1] > 1200) throw new InvalidArgumentException('Gambar denah tidak valid.');
+        }
+        $row = ['name' => $namaRuangan, 'carpet' => $idKarpet,
+            'carpet_name' => array_values(array_filter($karpetList, fn($k) => (int) $k['id_karpet'] === $idKarpet))[0]['nama_karpet'],
+            'geometry' => $geometry, 'object_area' => $luasObjek, 'net_area' => $totalLuas,
+            'direction' => $arah, 'method' => $metodePasang,
+            'meters' => pricing_number($_POST['total_meter_lari'] ?? 0, 'Meter lari'),
+            'seams' => pricing_number($totalSambungan, 'Sambungan'), 'binding' => $totalObras,
+            'waste' => pricing_number($_POST['luas_waste'] ?? 0, 'Waste'), 'pricing' => $pricing, 'image' => $image];
+    } catch (InvalidArgumentException $error) {
+        http_response_code(422); exit(quotation_escape($error->getMessage()));
+    }
+    $draft['customer'] = $idCustomer;
+    $draft['customer_name'] = $namaPelanggan;
+    $draft['date'] = $tanggalEstimasi;
+    $draft['rows'][] = $row;
+    header('Location: ' . (($_POST['submit_type'] ?? '') === 'add_next' ? 'estimasi.php' : 'penawaran.php') . '?draft=' . $draftKey);
     exit();
 }
 ?>
@@ -267,6 +281,11 @@ if (
             <p class="breadcrumb">Buat estimasi kebutuhan material dan biaya pemasangan,
                 langkah demi langkah.</p>
 
+            <?php if ($draft['rows']): ?>
+            <div class="card-box"><strong>Penawaran untuk <?= quotation_escape($draft['customer_name']) ?></strong>
+            <p><?= count($draft['rows']) ?> estimasi sudah ditambahkan. Isi ruangan / bahan berikutnya di bawah.</p>
+            <a href="penawaran.php?draft=<?= $draftKey ?>">Lihat ringkasan &amp; selesaikan penawaran</a></div>
+            <?php endif; ?>
             <!-- WIZARD BAR -->
             <div class="wizard-bar">
                 <div class="wizard-step active" id="stepIndicator1" onclick="goToStep(1)">
@@ -289,6 +308,9 @@ if (
 
             <!-- FORM ESTIMASI UTAMA -->
             <form id="mainEstimasiForm" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="draft" value="<?= $draftKey ?>">
+                <input type="hidden" name="csrf" value="<?= quotation_token() ?>">
+                <input type="hidden" name="layout_image" id="post_layout_image">
                 <input type="hidden" name="action" value="save_final_estimate">
                 <input type="hidden" name="submit_type" id="post_submit_type"
                     value="save_only">
@@ -323,10 +345,10 @@ if (
                                 <label class="form-lbl">Nama Pelanggan / Perusahaan <span
                                         style="color:#ef4444;">*</span></label>
                                 <select name="id_customer" id="txtPelanggan"
-                                    class="form-ctrl" required>
+                                    class="form-ctrl" <?= $draft['rows'] ? 'disabled' : '' ?> required>
                                     <option value="">Pilih customer terdaftar</option>
                                     <?php foreach ($customerList as $customer): ?>
-                                    <option value="<?= (int) $customer[ 'id_customer' ] ?>" <?= (int) ($_GET['id_customer'] ?? 0) ===
+                                    <option value="<?= (int) $customer[ 'id_customer' ] ?>" <?= (int) ($draft['customer'] ?? $_GET['id_customer'] ?? 0) ===
                                     (int) $customer['id_customer']
                                         ? 'selected'
                                         : '' ?>>
@@ -350,7 +372,7 @@ if (
                             <div>
                                 <label class="form-lbl">Tanggal Estimasi</label>
                                 <input type="date" name="tanggal_estimasi"
-                                    class="form-ctrl" value="<?= date( 'Y-m-d' ) ?>" required>
+                                    class="form-ctrl" value="<?= quotation_escape($draft['date'] ?? date('Y-m-d')) ?>" <?= $draft['rows'] ? 'readonly' : '' ?> required>
                             </div>
                             <div>
                                 <label class="form-lbl">Catatan Lapangan
@@ -629,13 +651,13 @@ if (
                             <div>
                                 <label class="form-lbl">Tarif Jasa Sambung / Heatbond Tape
                                     (per m)</label>
-                                <input type="number" id="tarifSambungan" class="form-ctrl"
+                                <input type="number" id="tarifSambungan" name="tarif_sambung" class="form-ctrl"
                                     value="25000" oninput="runSimulasiDanHitung()">
                             </div>
                             <div>
                                 <label class="form-lbl">Tarif Jasa Obras Tepi Ruangan (per
                                     m)</label>
-                                <input type="number" id="tarifObras" class="form-ctrl"
+                                <input type="number" id="tarifObras" name="tarif_obras" class="form-ctrl"
                                     value="15000" oninput="runSimulasiDanHitung()">
                             </div>
                         </div>
@@ -646,13 +668,13 @@ if (
                             <div>
                                 <label class="form-lbl">Bahan Lem Khusus Karpet (per
                                     m²)</label>
-                                <input type="number" id="tarifLem" class="form-ctrl"
+                                <input type="number" id="tarifLem" name="tarif_lem" class="form-ctrl"
                                     value="20000" oninput="runSimulasiDanHitung()">
                             </div>
                             <div>
                                 <label class="form-lbl">Jasa Pasang Rapi ke Lantai (per
                                     m²)</label>
-                                <input type="number" id="tarifJasaPasang"
+                                <input type="number" id="tarifJasaPasang" name="tarif_pasang"
                                     class="form-ctrl" value="25000"
                                     oninput="runSimulasiDanHitung()">
                             </div>
@@ -802,6 +824,29 @@ if (
                             </tr>
                         </table>
 
+                        <h3 class="box-title" style="margin-top:24px">Diskon (Opsional)</h3>
+                        <p>Kosongkan jika tanpa diskon. Diskon keseluruhan dapat diisi pada ringkasan penawaran setelah semua estimasi ditambahkan.</p>
+                        <div style="overflow-x:auto">
+                        <table class="result-table-box">
+                            <thead><tr><th>Item</th><th>Harga awal</th><th>Jenis diskon</th><th>Nilai diskon</th><th>Setelah diskon</th></tr></thead>
+                            <tbody>
+                            <?php foreach (['karpet' => 'Karpet', 'sambung' => 'Jasa Sambung', 'obras' => 'Obras', 'lem' => 'Lem', 'pasang' => 'Pemasangan', 'total' => 'Subtotal Estimasi'] as $key => $label): ?>
+                            <tr id="discount-row-<?= $key ?>" <?= $key === 'total' ? 'hidden' : '' ?>>
+                                <th><?= $label ?></th>
+                                <td id="discount-base-<?= $key ?>">Rp 0</td>
+                                <td><select class="form-ctrl" aria-label="Jenis diskon <?= $label ?>" name="discount[<?= $key ?>][type]" id="discount-type-<?= $key ?>" onchange="syncFinalTable()"><option value="percent">Persen (%)</option><option value="amount">Nominal (Rp)</option></select></td>
+                                <td><input class="form-ctrl" style="min-width:120px" type="number" min="0" step="0.01" placeholder="0" aria-label="Nilai diskon <?= $label ?>" name="discount[<?= $key ?>][value]" id="discount-value-<?= $key ?>" oninput="syncFinalTable()"></td>
+                                <td id="discount-net-<?= $key ?>">Rp 0</td>
+                            </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        </div>
+                        <p id="discount-error" role="alert" style="color:#b91c1c"></p>
+                        <p>Subtotal setelah diskon item: <strong id="discount-subtotal">Rp 0</strong></p>
+                        <p>Total diskon: <strong id="discount-saving">Rp 0</strong></p>
+                        <p style="font-size:20px">Total akhir: <strong id="discount-final">Rp 0</strong></p>
+
                         <div class="action-nav-buttons"
                             style="display:flex; justify-content:space-between; margin-top:24px;">
                             <button type="button" class="btn-wizard btn-prev"
@@ -809,12 +854,12 @@ if (
                             <div style="display:flex; gap:10px;">
                                 <button type="button" class="btn-wizard"
                                     style="background:#475569; color:#fff;"
-                                    onclick="submitForm('save_only')">
-                                    💾 Simpan ke Riwayat Saja
+                                    onclick="submitForm('add_next')">
+                                    ＋ Tambah Estimasi Berikutnya
                                 </button>
                                 <button type="button" class="btn-wizard btn-save-final"
-                                    onclick="submitForm('save_and_print')">
-                                    🖨️ Simpan & Cetak PDF Penawaran
+                                    onclick="submitForm('review')">
+                                    Lanjut ke Ringkasan Penawaran ➜
                                 </button>
                             </div>
                         </div>
@@ -1205,9 +1250,55 @@ if (
                     bPasang).toLocaleString('id-ID');
             }
 
-            document.getElementById('resTotalBiaya').innerText = 'Rp ' + Math.round(
-                    parseFloat(document.getElementById('post_biaya')?.value || 0))
-                .toLocaleString('id-ID');
+            updateDiscountSummary();
+            document.getElementById('resTotalBiaya').innerText = document.getElementById('discount-final').textContent;
+        }
+
+        function updateDiscountSummary() {
+            const number = id => Number(document.getElementById(id).value) || 0;
+            const round = value => Math.round((value + Number.EPSILON) * 100) / 100;
+            const money = value => 'Rp ' + value.toLocaleString('id-ID', {maximumFractionDigits: 2});
+            const carpet = document.getElementById('selectBahanKarpet').selectedOptions[0];
+            const bases = {
+                karpet: number('post_meter_lari') * Number(carpet?.dataset.harga || 0),
+                sambung: number('post_sambungan') * number('tarifSambungan'),
+                obras: number('post_obras') * number('tarifObras'),
+                lem: number('post_biaya_lem'), pasang: number('post_biaya_jasa_pasang')
+            };
+            let gross = 0, subtotal = 0, valid = true;
+            function apply(key, base) {
+                const input = document.getElementById('discount-value-' + key);
+                const type = document.getElementById('discount-type-' + key).value;
+                const value = Number(input.value);
+                const max = type === 'percent' ? 100 : base;
+                input.max = max;
+                const ok = !input.validity.badInput && Number.isFinite(value) && value >= 0 && value <= max;
+                input.setCustomValidity(ok ? '' : 'Diskon maksimal 100% atau sebesar subtotal item.');
+                input.setAttribute('aria-invalid', String(!ok));
+                valid = valid && ok;
+                const net = round(base - (ok ? round(type === 'percent' ? base * value / 100 : value) : 0));
+                document.getElementById('discount-base-' + key).textContent = money(base);
+                document.getElementById('discount-net-' + key).textContent = ok ? money(net) : 'Diskon tidak valid';
+                return net;
+            }
+            for (const [key, raw] of Object.entries(bases)) {
+                const active = key === 'karpet' || (selectedMetode === 'Permanen' ? ['lem', 'pasang'].includes(key) : ['sambung', 'obras'].includes(key));
+                document.getElementById('discount-row-' + key).hidden = !active;
+                document.getElementById('discount-value-' + key).disabled = !active;
+                document.getElementById('discount-type-' + key).disabled = !active;
+                if (!active) continue;
+                const base = round(raw);
+                gross += base;
+                subtotal += apply(key, base);
+            }
+            subtotal = round(subtotal);
+            const total = apply('total', subtotal);
+            document.getElementById('discount-error').textContent = valid ? '' : 'Periksa nilai diskon: tidak boleh negatif, lebih dari 100%, atau melebihi subtotal.';
+            document.getElementById('discount-subtotal').textContent = money(subtotal);
+            document.getElementById('discount-saving').textContent = valid ? money(round(gross - total)) : '—';
+            document.getElementById('discount-final').textContent = valid ? money(total) : '—';
+            document.getElementById('post_biaya').value = total;
+            return valid;
         }
 
         // 13. SUBMIT FORM
@@ -1240,7 +1331,18 @@ if (
                 alert('Isi nama pelanggan dan ruangan.');
                 return;
             }
-            runSimulasiDanHitung();
+            syncFinalTable();
+            if (!updateDiscountSummary()) return;
+            if (uploadedImageObj && isImageReady) {
+                const preview = document.createElement('canvas');
+                const scale = Math.min(1, 1000 / Math.max(uploadedImageObj.width, uploadedImageObj.height));
+                preview.width = Math.round(uploadedImageObj.width * scale);
+                preview.height = Math.round(uploadedImageObj.height * scale);
+                const ctx = preview.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, preview.width, preview.height);
+                ctx.drawImage(uploadedImageObj, 0, 0, preview.width, preview.height);
+                document.getElementById('post_layout_image').value = preview.toDataURL('image/jpeg', 0.75);
+            }
             document.getElementById('post_submit_type').value = type;
             document.getElementById('mainEstimasiForm').submit();
         }

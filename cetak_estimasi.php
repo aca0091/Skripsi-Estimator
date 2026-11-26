@@ -4,6 +4,14 @@ require_once __DIR__ . '/auth.php';
 check_page_access('cetak_estimasi.php');
 require_once __DIR__ . '/require.php';
 
+$quotationId = (int) ($_GET['penawaran'] ?? 0);
+if (!$quotationId && (isset($_GET['id']) || isset($_GET['id_estimasi']))) {
+    $parent = $pdo->prepare('SELECT id_penawaran FROM tb_estimasi WHERE id_estimasi=?');
+    $parent->execute([(int) ($_GET['id'] ?? $_GET['id_estimasi'])]);
+    $quotationId = (int) $parent->fetchColumn();
+}
+if ($quotationId > 0) { require __DIR__ . '/includes/print_quotation.php'; exit; }
+
 // Ambil ID Estimasi secara fleksibel
 $idEstimasi = isset($_GET['id'])
     ? (int) $_GET['id']
@@ -36,6 +44,8 @@ if (!$est) {
         "<div style='padding:30px; font-family:sans-serif; text-align:center;'><h3>Data estimasi #$idEstimasi tidak ditemukan di database.</h3><a href='estimasi.php'>Kembali ke Estimasi</a></div>"
     );
 }
+
+$pricing = !empty($est['pricing_snapshot']) ? json_decode($est['pricing_snapshot'], true) : null;
 
 $biayaKarpet = $est['total_meter_lari'] * $est['harga_per_m_lari'];
 
@@ -512,6 +522,32 @@ $nextLang = $lang === 'id' ? 'en' : 'id';
                 </tr>
             </thead>
             <tbody>
+                <?php if ($pricing): ?>
+                <?php
+                $labels = ['karpet' => $est['nama_karpet'], 'sambung' => $t['seam_desc'], 'obras' => $t['obras_desc'], 'lem' => $t['glue_desc'], 'pasang' => $t['install_desc']];
+                $discountLabel = $lang === 'en' ? 'Discount' : 'Diskon';
+                $rowNumber = 0;
+                foreach ($pricing['items'] as $key => $item): ?>
+                <tr>
+                    <td class="text-center"><?= ++$rowNumber ?></td>
+                    <td><?= htmlspecialchars($labels[$key], ENT_QUOTES, 'UTF-8') ?>
+                        <?php if ($item['discount']['amount'] > 0): ?>
+                        <br><small><?= $discountLabel ?> <?= $item['discount']['type'] === 'percent' ? number_format($item['discount']['value'], 2, ',', '.') . '%' : '' ?>: −Rp <?= number_format($item['discount']['amount'], 2, ',', '.') ?></small>
+                        <?php endif; ?>
+                    </td>
+                    <td class="text-center"><?= number_format($item['quantity'], 2, ',', '.') ?> <?= $key === 'karpet' ? $t['m_linear'] : (in_array($key, ['lem', 'pasang']) ? 'm²' : 'm') ?></td>
+                    <td class="text-right">Rp <?= number_format($item['rate'], 2, ',', '.') ?></td>
+                    <td class="text-right">
+                        <?php if ($item['discount']['amount'] > 0): ?><small><s>Rp <?= number_format($item['gross'], 2, ',', '.') ?></s></small><br><?php endif; ?>
+                        Rp <?= number_format($item['net'], 2, ',', '.') ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <tr><td colspan="4" class="text-right"><?= $lang === 'en' ? 'Subtotal after item discounts' : 'Subtotal setelah diskon item' ?></td><td class="text-right">Rp <?= number_format($pricing['subtotal'], 2, ',', '.') ?></td></tr>
+                <?php if ($pricing['discount']['amount'] > 0): ?>
+                <tr><td colspan="4" class="text-right"><?= $lang === 'en' ? 'Overall discount' : 'Diskon keseluruhan' ?> <?= $pricing['discount']['type'] === 'percent' ? number_format($pricing['discount']['value'], 2, ',', '.') . '%' : '' ?></td><td class="text-right">−Rp <?= number_format($pricing['discount']['amount'], 2, ',', '.') ?></td></tr>
+                <?php endif; ?>
+                <?php else: ?>
                 <!-- 1. Bahan Karpet -->
                 <tr>
                     <td class="text-center">1</td>
@@ -562,11 +598,12 @@ $nextLang = $lang === 'id' ? 'en' : 'id';
                 </tr>
                 <?php endif; ?>
 
+                <?php endif; ?>
                 <tr style="background: var(--bg-table-header); font-weight: bold;">
                     <td colspan="4" class="text-right"><?= $t['grand_total'] ?>:</td>
                     <td class="text-right"
                         style="font-size: 10pt; color: var(--brand-color);">Rp
-                        <?= number_format( $est['total_biaya'], 0, ',', '.' ) ?></td>
+                        <?= number_format( $est['total_biaya'], $pricing ? 2 : 0, ',', '.' ) ?></td>
                 </tr>
             </tbody>
         </table>
